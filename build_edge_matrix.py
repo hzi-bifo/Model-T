@@ -1,5 +1,11 @@
 import sys
-import dendropy as dp
+try:
+        import dendropy as dp
+except ImportError:
+    sys.stderr.write(
+                        "Scripts needs dendropy; run importpackage dendropy before execution\n")
+    sys.exit(1)
+
 class build_edge_matrix:
 
     def __init__(self,tree_f, format, phyletic_f, event_f):
@@ -8,7 +14,7 @@ class build_edge_matrix:
         t.read_from_path(tree_f, format, suppress_internal_node_taxa=False)
         self.phy = dp.StandardCharacterMatrix.get_from_path(phyletic_f, "fasta")
         self.char2ev = self.read_events(event_f)
-        self.missing_characters = ("?", "-")
+        self.missing_characters = ("?", "-", "-1.0")
         self.event_f=event_f
 
     def get_edges(self, pt):
@@ -19,7 +25,6 @@ class build_edge_matrix:
         return edges
 
     def get_edges_h(self, l, r,node, edges, pt):
-        print "getting edges for phenotype", pt
         if l.is_leaf() and r.is_leaf():
             return self.update(l, r, node, edges, pt)
         elif l.is_leaf():
@@ -36,67 +41,71 @@ class build_edge_matrix:
 
     def update(self, l, r,node, edges, pt):
         #print type(node.taxon), type(l), type(r)
+        #if node.taxon.label == 'N14':
+        #    print l, r
+        #if  l1.taxon.label == 'N14':
+        #    print "links", l,r
+        #if  r1.taxon.label == 'N14':
+        #    print "rechts", l,r
         #both children stem from missing values (NAs)
-        if node.taxon.label == 'N45':
-            print l, r
         l1, r1 = node.child_nodes()
-        if  l1.taxon.label == 'N45':
-            print "links", l,r
-        if  r1.taxon.label == 'N45':
-            print "rechts", l,r
         if l is None and r is None:
             return None
         #node l is ancestor of NA node return the right node
         elif l is None:
             if type(r) == type([]):
-                r.append(r1.taxon.label)
+                r.append(node.taxon.label)
                 return r
             elif type(r) == type(True):
-                return [r1.taxon.label]
+                return [r1.taxon.label, node.taxon.label]
             elif type(r) == type(node):
                 if str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
-                    return [r.taxon.label]
+                    return [r.taxon.label, node.taxon.label]
                 else:
                     return None
         #node r is ancestor of NA node return the left node
         elif r is None:
             if type(l) == type([]):
-                l.append(l1.taxon.label)
+                l.append(node.taxon.label)
                 return l
             elif type(l) == type(True):
-                return [l1.taxon.label]
+                return [l1.taxon.label, node.taxon.label]
             elif type(l) == type(node):
                 if str(self.phy[l.taxon.label][pt]) not in self.missing_characters:
-                    return [l.taxon.label]
+                    return [l.taxon.label, node.taxon.label]
                 else:
                     return None
         #one node is list the other leave
         elif type(l) == type(node) and type(r) == type([]):
             if str(self.phy[l.taxon.label][pt]) not in self.missing_characters:
+                #r.append(r1.taxon.label)
                 r.append(node.taxon.label)
                 edges.append(r)
                 edges.append((l.taxon.label, node.taxon.label))
                 return True
             else:
-                r.append(r1.taxon.label)
+                r.append(node.taxon.label)
                 return r
         elif type(r) == type(node) and type(l) == type([]):
             if str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
                 l.append(node.taxon.label)
+                #l.append(node.taxon.label)
                 edges.append(l)
                 edges.append((r.taxon.label, node.taxon.label))
                 return True
             else:
-                l.append(l1.taxon.label)
+                l.append(node.taxon.label)
                 return l
         #both nodes derive from non NA nodes
-        #one of the nodes is sane and isn't an ancestor of a NA node
         elif type(l) == type([]) and type(r) == type([]):
+            #l.append(l1.taxon.label)
             l.append(node.taxon.label)
+            #r.append(r1.taxon.label)
             r.append(node.taxon.label)
             edges.append(l)
             edges.append(r)
             return True
+        #one of the nodes is sane and isn't an ancestor of a NA node
         elif type(l) == type(True) or type(r) == type(True):
             #check if left node is either type node or list of nodes
             if type(l) != type(True):
@@ -106,24 +115,26 @@ class build_edge_matrix:
                         edges.append((l.taxon.label, node.taxon.label))
                         edges.append((r1.taxon.label, node.taxon.label))
                         return True
-                    else: return [r1.taxon.label]
+                    else: return [node.taxon.label, r1.taxon.label]
                 #check if left node is type list
                 elif type(l) == type([]):
                     l.append(node.taxon.label)
+                    #l.append(node.taxon.label)
                     edges.append(l)
                     edges.append((r1.taxon.label, node.taxon.label))
                     return True
             #check if right node is either type node or list of nodes
-            if type(r) != type(True):
+            elif type(r) != type(True):
                 #check if right node is leave node
                 if type(r) == type(r1) and r.is_leaf():
                     if str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
                         edges.append((r.taxon.label, node.taxon.label))
                         edges.append((l1.taxon.label, node.taxon.label))
                         return True
-                    else: return [l1.taxon.label]
+                    else: return [l1.taxon.label, node.taxon.label]
                 #check if right node is type list
                 elif type(r) == type([]):
+                    #r.append(r1.taxon.label)
                     r.append(node.taxon.label)
                     edges.append(r)
                     edges.append((l1.taxon.label, node.taxon.label))
@@ -234,9 +245,13 @@ class build_edge_matrix:
     def get_all_edge_m(self,gt_start,gt_end, pt_start, pt_end, out_dir):
         """for all phenotypes generate a edge based matrix"""
         for pt in range(pt_start, pt_end+1):
+            #check if phenotype has any events associated with it
+            if pt not in self.char2ev:
+                print "phenotype", pt, "has not events associated with it. Skipping.."
+                continue
             print "current phenotype number being processed", pt
             edges = self.get_edges(pt)
-            print edges
+            #print edges
             pt_dict = self.get_pt_dict(edges)
             edge2char2val =self.map_events(pt_dict, gt_start,gt_end, self.char2ev,pt, edges)
             #TODO check if outdir exists otherwise create
@@ -289,10 +304,10 @@ if __name__ == '__main__':
 
     t = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre.internal_nodes_labeled.newick"
     p = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts.fasta"
-    e = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/events_g2_l1.txt"
+    e = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/events_g3_l1.txt"
     f = "newick"
     bem = build_edge_matrix(t,f,p,e)
-    bem.get_all_edge_m(0,8475,8476,8568, "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/input_g2_l1/")
+    bem.get_all_edge_m(0,8475,8476,8568, "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/input_g3_l1/")
     sys.exit(1)
     try:
         optlist, args = getopt.getopt(sys.argv[1:], "t:f:p:e:")
