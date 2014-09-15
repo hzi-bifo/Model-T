@@ -1,4 +1,6 @@
 import sys
+import named_narray as na
+import os.path
 try:
         import dendropy as dp
 except ImportError:
@@ -8,11 +10,11 @@ except ImportError:
 
 class build_edge_matrix:
 
-    def __init__(self,tree_f, format, phyletic_f, event_f):
+    def __init__(self,tree_f, format, phyn_f, phym_f, event_f):
         t = dp.Tree()
         self.tree = t
         t.read_from_path(tree_f, format, suppress_internal_node_taxa=False)
-        self.phy = dp.StandardCharacterMatrix.get_from_path(phyletic_f, "fasta")
+        self.phy = na.named_matrix(phym_f, phyn_f)
         self.char2ev = self.read_events(event_f)
         self.missing_characters = ("?", "-", "-1.0")
         self.event_f=event_f
@@ -216,10 +218,10 @@ class build_edge_matrix:
                     if ev[2] == 'loss':
                         edge2char2val[isn][gt] = -int(ev[3])
                     else: edge2char2val[isn][gt] = int(ev[3])
-                    #account for phenotype edges
+        #account for phenotype edges
         #print "edge2char2val", edge2char2val
         for ev in char2ev[pt]:
-            print ev[0], ev[1]
+            print ev
             edge1 = node2edge[ev[0]]
             edge2 = node2edge[ev[1]]
             isn = edge1.intersection(edge2).pop()
@@ -269,6 +271,8 @@ if __name__ == '__main__':
 -pt <range of phenotypes> to consider e.g 8550-8560
 > <out file> with gain and loss events
         """ % (sys.argv[0])
+        sys.exit(1)
+    #testing: uncomment to run (but take a look what you are uncommenting first!)
     #t = "/net/metagenomics/projects/phenotypes_20130523/code/build_edge_m/sampletree.newick"
     #p = "/net/metagenomics/projects/phenotypes_20130523/code/build_edge_m/charm.fasta"
     #e = "/net/metagenomics/projects/phenotypes_20130523/code/build_edge_m/events.txt"
@@ -302,15 +306,14 @@ if __name__ == '__main__':
     #bem = build_edge_matrix(t,f,p,e)
     #bem.get_all_edge_m( 0,10,560,561, "out_matrices")
 
-    t = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre.internal_nodes_labeled.newick"
-    p = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts.fasta"
-    e = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/events_g3_l1.txt"
-    f = "newick"
-    bem = build_edge_matrix(t,f,p,e)
-    bem.get_all_edge_m(0,8475,8476,8568, "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/input_g3_l1/")
-    sys.exit(1)
+    #t = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre.internal_nodes_labeled.newick"
+    #p = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts.fasta"
+    #e = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/events_g3_l1.txt"
+    #f = "newick"
+    #bem = build_edge_matrix(t,f,p,e)
+    #bem.get_all_edge_m(0,8475,8476,8568, "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/parsimony/input_g3_l1/")
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "t:f:p:e:")
+        optlist, args = getopt.getopt(sys.argv[1:], "t:f:n:p:e:g:h:o:")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
@@ -319,6 +322,7 @@ if __name__ == '__main__':
     f=None
     p=None
     e = None
+    n = None
     for o, a in optlist:
         if o == "-t":
             t = a
@@ -326,7 +330,23 @@ if __name__ == '__main__':
             f = a
         if o == "-p":
             p = a
+        if o == "-n":
+            n = a
         if o == "-e":
             e = a
-    bem = build_edge_matrix(t,f,p,e)
+        if o == "-g":
+            g1, g2 = [int(i) for i in a.split("-")]
+        if o == "-h":
+            pt1, pt2 = [int(i) for i in a.split("-")]
+        if o == "-o":
+            out = a
+            #check if the directory already exists
+            if os.path.exists(out):
+                sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
+                sys.exit(1)
+            else:
+                os.mkdir(out)
+
+    bem = build_edge_matrix(t,f,n, p, e)
+    bem.get_all_edge_m(g1,g2,pt1,pt2, out)
 
