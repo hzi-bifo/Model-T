@@ -6,10 +6,12 @@
 import numpy as np
 import pandas
 import sklearn.svm as svm
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, load, dump
+#TODO use the sklearn version of joblib instead to remove the direct joblib dependency
 from operator import itemgetter
 import math
 def normalize(array):
+    #TODO check normalization procedure
     """normalize a feature matrix
     1) by making the rows sum to 1
     2) by making the max value for each feature equal 1"""
@@ -25,7 +27,7 @@ def normalize(array):
     cs[cs==0] = 1000
     array_rs_cs = array_rs/cs
     #print np.max(array_rs_cs,0)
-    return array_rs_cs
+    return  array_rs_cs, cs
 
 
 def write_features( feats, model_out, pt_out,):
@@ -137,17 +139,19 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs):
 
 
 def majority_feat_sel(x, y, all_preds, params, c_params, k, model_out, pt_out):
-    """determine the features occuring the majority of the k best models"""
+    """determine the features occuring in the majority of the k best models"""
     #determine the k best classifiers
     baccs = [bacc(recall_pos(y, all_preds[:,j]), recall_neg(y, all_preds[:,j])) for j in range(len(c_params))]
     recps = [recall_pos(y, all_preds[:,j]) for j in range(len(c_params))]
     recns = [recall_neg(y, all_preds[:,j]) for j in range(len(c_params))]
     baccs_s = sorted(((baccs[i], recps[i], recns[i], c_params[i]) for i in range(len(c_params))), key=itemgetter(0), reverse=True )
     models = np.zeros(shape=(x.shape[1], k))
+    predictors = []
     for i in range(k):
         predictor = svm.LinearSVC(C=baccs_s[i][3])
         predictor.set_params(**params)
         predictor.fit(x, y)
+        predictors.append(predictor)
         #save the model
         models[:,i] = predictor.coef_
     feats = []
@@ -156,12 +160,14 @@ def majority_feat_sel(x, y, all_preds, params, c_params, k, model_out, pt_out):
         if sum(models[i,:] > 0) >= math.ceil(k/2.0):
             feats.append(str(i))
 
-    #TODO save the bacc etc. to disk
     baccs_s_np = np.array(baccs_s)[0:k,0:3].T
     names = ['bacc', "pos_rec", "neg_rec"]
     baccs_s_np_p = pandas.DataFrame(baccs_s_np).rename(dict((i,names[i]) for i in range(3)))
-    pandas.DataFrame(baccs_s_np_p).to_csv("%sperf_%s.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k], float_format='%.3f')
-    #TODO save the majority features to disk
+    pandas.DataFrame(baccs_s_np_p).to_csv("%s/perf_%s.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k], float_format='%.3f')
+    #write majority features to disk
     write_features(feats, model_out,pt_out)
-    #TODO save feature matrix to disk
-    pandas.DataFrame(models).to_csv("%sfeats_%s.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k])
+    #write coefficient matrix to disk
+    pandas.DataFrame(models).to_csv("%s/feats_%s.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k])
+    #pickle the predictors
+    dump(predictors, '%s/pickled/predictors_%s.pkl'%(model_out,pt_out))
+

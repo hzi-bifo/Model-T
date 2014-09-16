@@ -2,13 +2,14 @@ import nested_cv as ncv
 import numpy as np
 import os.path
 import sys
+import shutil
 
 #c_params = [0.1,1]
 c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
 #c_params = [1,5,10,50,100]
 
 def write_miscl(miscl_plus,  model_out, pt_out):
-    f = open("%s%s_miscl.txt"%(model_out,pt_out), 'w')
+    f = open("%s/%s_miscl.txt"%(model_out,pt_out), 'w')
     gideon_f = open("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gideon_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_stol_20130904.sp_uq.taxid.txt", "r")
     id2sp = {}
     ls = gideon_f.readlines()
@@ -22,14 +23,21 @@ def write_miscl(miscl_plus,  model_out, pt_out):
 
 
 
-def cv_and_fs(data_f = None, bin=True, model_out="stol_2_NCBI20140115_candidatus_sample30/parsimony/models_g3_l1/", cv_outer=10, cv_inner=None):
+def cv_and_fs(bin, model_out, data_f = None, cv_outer=10, cv_inner=None):
     #create output directory if not already existing, append input parameter specific suffices
-    model_out = "%s_%s_%s"(model_out, "bin" if bin else "counts", "recbased" if os.path.isdir(data_f) else "phypat")
+    model_out = "%s/%s_%s"%(model_out, "bin" if bin else "counts", "recbased" if os.path.isdir(data_f) else "phypat")
     if not os.path.exists(model_out):
         os.mkdir(model_out)
     else:
-        sys.stderr("warning output directory %s already exists, exiting")
-        sys.exit(1)
+        sys.stderr.write("warning output directory %s already exists\n"%model_out)
+        sys.stderr.write("determine what you want to do\n")
+        while True:
+            c = raw_input("press 0 for abort and 1 for overwrite (delete existing directory)\n")
+            if c == "0": 
+                sys.exit(1)
+            elif c == "1": 
+                shutil.rmtree(model_out, ignore_errors=True)
+                break 
     #write values of the C parameter to disk
     with open("%s/c_params.txt" % model_out, 'w') as out_f:
         out_f.write("C_params\n")
@@ -41,6 +49,8 @@ def cv_and_fs(data_f = None, bin=True, model_out="stol_2_NCBI20140115_candidatus
         a = np.genfromtxt(data_f, missing_values=["?"], dtype=int)
 
     f = open("%s/cv_acc.txt"%model_out, "w")
+    #create a directory for storing the pickled models
+    os.mkdir("%s/pickled"%model_out)
     for pt in range(8476,8568):
     #for pt in range(8486,8487):
         pt_out = pt
@@ -64,8 +74,10 @@ def cv_and_fs(data_f = None, bin=True, model_out="stol_2_NCBI20140115_candidatus
         if bin:
             x = (x>0).astype('int')
         else:
-            x = ncv.normalize(x.astype('double'))
-            #print x
+            x, nf = ncv.normalize(x.astype('double'))
+            #save the normalization factors to disk for later testing
+            np.savetxt(fname="%s/%s_normf.dat"%(model_out, pt_out), X=nf)
+             
         #experiment: add inverse features
         #x_inv = x.copy()
         #plus =x_inv==1
@@ -98,7 +110,7 @@ def cv_and_fs(data_f = None, bin=True, model_out="stol_2_NCBI20140115_candidatus
         print "pt_out", pt, "with", sum(y==+1), "positive samples and", sum(y==-1), "negative samples"
         #check if we want to do nested cross validation accuracy estimation
         if not cv_inner is None:
-            all_preds = np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs=15))
+            all_preds = np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs=10))
             #accuracy +1 class
             pos_acc = ncv.recall_pos(y, all_preds)
             #accuracy -1 class
@@ -121,8 +133,8 @@ def cv_and_fs(data_f = None, bin=True, model_out="stol_2_NCBI20140115_candidatus
         ncv.majority_feat_sel(x, y, all_preds, params, c_params, 5, model_out, pt_out)
     f.close()
 if __name__=="__main__":
-    phy_p="stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts.tsv"
-    pars_p="stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts.tsv"
-    cv_and_fs(data_f = phy_p, bin=True,  model_out = "stol_2_NCBI20140115_candidatus_sample30/ll_models/bin_exp_sklearn/", cv_outer=10, cv_inner=10)
+    phy_p="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts.tsv"
+    pars_p="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts.tsv"
+    cv_and_fs( bin=True,  model_out = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/ll_models/", data_f = phy_p, cv_outer=10, cv_inner=None)
     #cv_and_fs(data_f=phy_p, bin=False, rec_based=False, model_out = "stol_2_NCBI20140115_candidatus_sample30/ll_models/norm/", cv_outer=10)
     #cv_and_fs( bin=True, rec_based=True, model_out = "stol_2_NCBI20140115_candidatus_sample30/parsimony/models_g2_l1/", cv_inner = 5, cv_outer=5)
