@@ -129,14 +129,14 @@ if __name__ == '__main__':
 -h <range of phenotypes> to consider e.g 8550-8560
 -o <out_dir> for the output matrices
         """ % (sys.argv[0])
-
-        t = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre.internal_nodes_labeled.newick"
-        e = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/RESULTS/gainLossProbExpPerPosPerBranch.txt"
-        phy_m = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts.tsv"
-        phy_n = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon_sp+st.taxid_only.txt"
-        f = "newick"
-        bem = build_edge_matrix_likelihood(t,f,phy_n, phy_m,e)
-        bem.get_all_edge_m(0,10,8477,8477, "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain")
+        #testing only: uncomment and run without cmdargs
+        #t = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre.internal_nodes_labeled.newick"
+        #e = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gainLoss_input_v2_candidatus_sample30/RESULTS/gainLossProbExpPerPosPerBranch.txt"
+        #phy_m = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts.tsv"
+        #phy_n = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon_sp+st.taxid_only.txt"
+        #f = "newick"
+        #bem = build_edge_matrix_likelihood(t,f,phy_n, phy_m,e)
+        #bem.get_all_edge_m(0,10,8477,8477, "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain")
         sys.exit(1)
     try:
         optlist, args = getopt.getopt(sys.argv[1:], "t:f:p:n:e:xlg:h:o:")
