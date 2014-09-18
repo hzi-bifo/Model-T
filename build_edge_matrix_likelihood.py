@@ -1,6 +1,7 @@
 import build_edge_matrix as bem
 import sys
 import named_narray as na
+import os
 try:
     import dendropy as dp
 except ImportError:
@@ -48,11 +49,11 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
             elif etype == "loss" and self.use_gain_events:
                 continue
             ancestor = self.label2node[node].parent_node.taxon.label
-            #print ancestor
-            if not int(char) in char2ev:
-                char2ev[int(char)] = [(node,ancestor,etype, prob, exp)]
+            #map characters to their events, -1 to begin counting by zero as gainLoss output starts counting at 1!
+            if not int(char) - 1 in char2ev:
+                char2ev[int(char) - 1] = [(node,ancestor,etype, prob, exp)]
             else: 
-                char2ev[int(char)].append((node,ancestor,etype, prob, exp))
+                char2ev[int(char) - 1].append((node,ancestor,etype, prob, exp))
         return char2ev
 
 
@@ -175,6 +176,12 @@ if __name__ == '__main__':
             pt1, pt2 = [int(i) for i in a.split("-")]
         if o == "-o":
             out = a
+            #check if the directory already exists
+            if os.path.exists(out):
+                sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
+                sys.exit(1)
+            else:
+                os.mkdir(out)
     bem = build_edge_matrix_likelihood(t,f,n,p,e, use_likelihood=use_likelihood, use_gain_events=use_gain_events)
     bem.get_all_edge_m(g1,g2,pt1,pt2, out)
 

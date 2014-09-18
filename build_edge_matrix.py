@@ -244,20 +244,19 @@ class build_edge_matrix:
                 s+="%s\n"%edge2char2val[tuple(e)][pt]
             else: s+="0\n"
             out_fo.write(s)
+
     def get_all_edge_m(self,gt_start,gt_end, pt_start, pt_end, out_dir):
         """for all phenotypes generate a edge based matrix"""
         for pt in range(pt_start, pt_end+1):
             #check if phenotype has any events associated with it
             if pt not in self.char2ev:
-                print "phenotype", pt, "has not events associated with it. Skipping.."
+                print "phenotype", pt, "has no events associated with it. Skipping.."
                 continue
             print "current phenotype number being processed", pt
             edges = self.get_edges(pt)
-            #print edges
             pt_dict = self.get_pt_dict(edges)
-            edge2char2val =self.map_events(pt_dict, gt_start,gt_end, self.char2ev,pt, edges)
-            #TODO check if outdir exists otherwise create
-            self.get_edge_m(edge2char2val, edges, gt_start,gt_end,pt, "%s/pt%s.dat"%(out_dir,pt))
+            edge2char2val =self.map_events(pt_dict, gt_start, gt_end + 1, self.char2ev,pt, edges)
+            self.get_edge_m(edge2char2val, edges, gt_start, gt_end + 1, pt, "%s/pt%s.dat"%(out_dir,pt))
 
 if __name__ == '__main__':
     import getopt
@@ -268,7 +267,7 @@ if __name__ == '__main__':
 -p <phyletic pattern> phyletic_patterns in fasta format
 -e <events> file with parsimony events
 -g <range of genotypes> e.g. 1-8400
--pt <range of phenotypes> to consider e.g 8550-8560
+-h <range of phenotypes> to consider e.g 8550-8560
 > <out file> with gain and loss events
         """ % (sys.argv[0])
         sys.exit(1)
