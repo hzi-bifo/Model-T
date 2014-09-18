@@ -29,7 +29,7 @@ def majority_predict(pt, model_dir, test_data):
         #TODO test normalization
     else: 
         test_data_n = (test_data > 0).astype('int')
-    predictors = joblib.load("%spickled/predictors_%s.pkl"%(model_dir, pt))
+    predictors = joblib.load("%spickled/%s_predictors.pkl"%(model_dir, pt))
     #build prediction matrix
     preds = np.zeros((test_data.shape[0], len(predictors)))
     for i in range(len(predictors)):
@@ -39,7 +39,6 @@ def majority_predict(pt, model_dir, test_data):
 
 def annotate_and_predict(pt, pfam_f, model_dir, test_data_f, ORF_f, modes, out_dir):
     command = annotation_command % {"ORF_file":ORF_f, "annotation_out":"%s/annotation"%(out_dir), "commands_out":"%s/commands"%(out_dir), "modes":modes}
-    print command
     os.system(command)
     #predict
     m = pandas.read_csv(test_data_f, sep="\t",)

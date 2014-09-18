@@ -37,6 +37,7 @@ def write_features( feats, model_out, pt_out,):
     ls = pfam_f.readlines()
     for i in range(len(ls)):
         elems = ls[i].strip().split("\t")
+        #mapping counts from 1 
         id2pf[int(elems[0])-1] = (elems[1],elems[2])
     for feat in feats:
         f.write("%s\t%s\n"%(id2pf[int(feat)][0],id2pf[int(feat)][1]))
@@ -163,11 +164,11 @@ def majority_feat_sel(x, y, all_preds, params, c_params, k, model_out, pt_out):
     baccs_s_np = np.array(baccs_s)[0:k,0:3].T
     names = ['bacc', "pos_rec", "neg_rec"]
     baccs_s_np_p = pandas.DataFrame(baccs_s_np).rename(dict((i,names[i]) for i in range(3)))
-    pandas.DataFrame(baccs_s_np_p).to_csv("%s/perf_%s.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k], float_format='%.3f')
+    pandas.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k], float_format='%.3f')
     #write majority features to disk
     write_features(feats, model_out,pt_out)
     #write coefficient matrix to disk
-    pandas.DataFrame(models).to_csv("%s/feats_%s.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k])
+    pandas.DataFrame(models).to_csv("%s/%s_feats.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k])
     #pickle the predictors
-    dump(predictors, '%s/pickled/predictors_%s.pkl'%(model_out,pt_out))
+    dump(predictors, '%s/pickled/%s_predictors.pkl'%(model_out,pt_out))
 
