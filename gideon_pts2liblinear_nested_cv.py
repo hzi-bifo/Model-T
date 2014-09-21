@@ -66,6 +66,7 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, data_f = None,
                 continue
             a = np.genfromtxt("%s/pt%s.dat"%(data_f,pt))
             #treat gains and losses the same
+            #only relevant for the parsimony case
             a[a==-1]=1
             #discard the row names
             #TODO change to panda dataframe to keep the row names
@@ -93,7 +94,9 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, data_f = None,
         #end experiment
         #target vector with missing data removed
         y=a[np.logical_not(a[:,pt]==-1),pt]
-        y[y==0] = -1
+        y[(y==0)] = -1
+        #for the likelihood matrices, shouldn't make a difference for any other input type
+        y[(y==2)] = 1
         #experiment: reduce the number of negative examples to approximately the number of positive samples
         #neg_class = (y==-1)
         #pos_class = (y==1)
