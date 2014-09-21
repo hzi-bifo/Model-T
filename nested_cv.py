@@ -99,6 +99,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs):
         ofolds = setup_folds(x, y, cv_outer)
         ocv_preds = []
         for fold in ofolds:
+            #TODO with pandas that should code easier
             neg_fold = np.ones(len(y),dtype='bool')
             for k in fold:
                 neg_fold[k] = False
@@ -161,10 +162,11 @@ def majority_feat_sel(x, y, all_preds, params, c_params, k, model_out, pt_out):
         if sum(models[i,:] > 0) >= math.ceil(k/2.0):
             feats.append(str(i))
 
+    rownames = [baccs_s[i][3] for i in range(k)] 
+    colnames = ['bacc', "pos_rec", "neg_rec"]
     baccs_s_np = np.array(baccs_s)[0:k,0:3].T
-    names = ['bacc', "pos_rec", "neg_rec"]
-    baccs_s_np_p = pandas.DataFrame(baccs_s_np).rename(dict((i,names[i]) for i in range(3)))
-    pandas.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k], float_format='%.3f')
+    baccs_s_np_p = pandas.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
+    pandas.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(model_out,pt_out), sep="\t", float_format='%.3f', header=rownames)
     #write majority features to disk
     write_features(feats, model_out,pt_out)
     #write coefficient matrix to disk
