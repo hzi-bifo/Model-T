@@ -4,30 +4,27 @@ import os.path
 import sys
 import shutil
 import getopt
+import pandas as ps
 
-#c_params = [0.1,1]
-c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
+c_params = [0.1,1]
+#c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
 #c_params = [1,5,10,50,100]
 
-def write_miscl(a, miscl_plus,  model_out, pt_out):
+def write_miscl(miscl_plus,  model_out, pt_out):
     gideon_f = open("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gideon_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_stol_20130904.sp_uq.taxid.txt", "r")
     ls = gideon_f.readlines()
     id2sp = {}
     f = open("%s/%s_miscl.txt"%(model_out,pt_out), 'w')
     for i in range(len(ls)):
         elems = ls[i].strip().split("\t")
-        id2sp[i] = (elems[0],elems[1])
-    for m in miscl_plus.T:
-        print m
-        try:
-            f.write("%s\t%s\t%s\t%s\n"%(id2sp[m[0]][0],m[1], m[2], id2sp[m[0]][1]))
-        except KeyError:
-            break
+        id2sp[int(elems[1])] = elems[0]
+    for i in range(miscl_plus.shape[0]):
+        f.write("%s\t%s\t%s\t%s\n"%(miscl_plus.index[i], miscl_plus.iloc[i,0], miscl_plus.iloc[i,1], id2sp[miscl_plus.index[i]]))
     f.close()
 
 
 
-def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, data_f = None, cv_outer=10, cv_inner=None, n_jobs = 1):
+def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1):
     #create output directory if not already existing, append input parameter specific suffices
     #model_out = "%s/%s_%s"%(model_out, "bin" if bin else "counts", "recbased" if os.path.isdir(data_f) else "phypat")
     #if not os.path.exists(model_out):
@@ -47,41 +44,47 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, data_f = None,
         out_f.write("C_params\n")
         for c in c_params:
             out_f.write("%s\n"%c)
-
-    #read in data if not in anchestral character state prediction
-    if os.path.isfile(data_f):
-        a = np.genfromtxt(data_f, missing_values=["?"], dtype=int)
-
+    #read in phyletic patterns
+    p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0, header = None)
     f = open("%s/cv_acc.txt"%model_out, "w")
     #create a directory for storing the pickled models
     os.mkdir("%s/pickled"%model_out)
+    #iterate over all phenotypes
     for pt in range(pt_start, pt_end+1):
-    #for pt in range(8486,8487):
         pt_out = pt
-        print pt
-        #feature matrix with missing data removed
-        if os.path.isdir(data_f):
-            if not  os.path.exists("%s/pt%s.dat"%(data_f,pt)):
+        x_p = p[p.iloc[:,pt].notnull()].iloc[:, gt_start:gt_end+1]
+        y_p = p[p.iloc[:,pt].notnull()].iloc[:, pt]
+        if not rec_dir is None:
+            if not os.path.exists("%s/pt%s.dat"%(rec_dir,pt)):
                 print "skipping pt", pt, "no reconstruction matrix found, possibly due to no reconstruction events for this phenotype"
                 continue
-            a = np.genfromtxt("%s/pt%s.dat"%(data_f,pt))
+            a = ps.read_csv("%s/pt%s.dat"%(rec_dir,pt), index_col = 0, sep = "\t", header = None)
             #treat gains and losses the same
             #only relevant for the parsimony case
-            a[a==-1]=1
+            if not parsimony_params is None :
+                raise Exception("not yet implemented")
+            #a[a==-1]=1
             #discard the row names
             #TODO change to panda dataframe to keep the row names
-            a = a[:,1:(a.shape[1])]
-            #phenotype index
+            a = a.iloc[:,0:(a.shape[1])]
+            #phenotype index in the reconstruction matrix
+            print pt
             pt = a.shape[1] - 1 
-        #discard samples which are missing for that phenotype and keep mapping of samples to orginal matrix a in x2a
-        x2a =  np.ravel(np.logical_not(a[:,pt]==-1)).nonzero()
-        x=a[np.logical_not(a[:,pt]==-1),gt_start:gt_end+1]
+            x = a.iloc[:, gt_start:gt_end+1]
+            y = a.iloc[:, pt]
         if bin:
-            x = (x>0).astype('int')
+            x_p = (x_p > 0).astype('int')
+            x = (x > 0).astype('int')
         else:
-            x, nf = ncv.normalize(x.astype('double'))
+            x_p, nf = ncv.normalize(x.astype('double'))
             #save the normalization factors to disk for later testing
+            #TODO what about reconstruction case??
+            #TODO if this goes alright
             np.savetxt(fname="%s/%s_normf.dat"%(model_out, pt_out), X=nf)
+        if rec_dir is None:
+            #we are in pure phyletic pattern mode
+            x = x_p
+            y = y_p
              
         #experiment: add inverse features
         #x_inv = x.copy()
@@ -92,11 +95,13 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, data_f = None,
         #print x.shape, x_inv.shape
         #x = np.concatenate((x,x_inv),axis=1)
         #end experiment
+
         #target vector with missing data removed
-        y=a[np.logical_not(a[:,pt]==-1),pt]
         y[(y==0)] = -1
-        #for the likelihood matrices, shouldn't make a difference for any other input type
-        y[(y==2)] = 1
+        #if in likelihood reconstruction case set entries of the target vector with likely gain and loss to 1
+        #TODO what about the other entries in x?
+        if not rec_dir is None and not likelihood_params is None:
+            y[(y==2)] = 1
         #experiment: reduce the number of negative examples to approximately the number of positive samples
         #neg_class = (y==-1)
         #pos_class = (y==1)
@@ -116,28 +121,38 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, data_f = None,
         params = {'loss':'l2', 'tol':0.000001, 'penalty':'l1', 'dual':False, 'fit_intercept':True, 'intercept_scaling':1, 'class_weight':'auto', 'random_state':1}
         print "pt_out", pt, "with", sum(y==+1), "positive samples and", sum(y==-1), "negative samples"
         #check if we want to do nested cross validation accuracy estimation
+        is_rec_based = False
+        if not rec_dir is None:
+            is_rec_based = True
         if not cv_inner is None:
-            all_preds = np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs=n_jobs))
+            print y_p.index.values
+            all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, likelihood_params, parsimony_params, is_phypat_and_rec)))
             #accuracy +1 class
-            pos_acc = ncv.recall_pos(y, all_preds)
+            all_preds.index = y_p.index
+            y_p_t = y_p.copy()
+            y_p_t[y_p_t == 0] = -1
+            print all_preds, y_p_t, "y_p and all preds nested cv"
+            pos_acc = ncv.recall_pos(y_p_t, all_preds)
+            print "pos_acc", pos_acc
             #accuracy -1 class
-            neg_acc = ncv.recall_neg(y, all_preds)
+            neg_acc = ncv.recall_neg(y_p_t, all_preds)
+            print "neg_acc", neg_acc
             #balanced accuracy
             bacc = ncv.bacc(pos_acc, neg_acc)
-            print "pos_acc", pos_acc
-            print "neg_acc", neg_acc
             print "balanced acc", bacc
             #TODO write misclassified samples to disk
             #get misclassified samples
-            miscl = (all_preds != y).ravel().nonzero()[0]
+            miscl = y_p_t.index[(all_preds != y_p_t)]
             #bind actual labels and predictions
-            miscl_plus = np.array([miscl, y[miscl], all_preds[miscl]])
+            print miscl, y_p_t.loc[miscl], all_preds.loc[miscl]
+            miscl_plus = ps.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
             print miscl_plus
-            write_miscl(a, miscl_plus, model_out, pt_out)
+            write_miscl(miscl_plus, model_out, pt_out)
             f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
             f.flush()
-        all_preds = ncv.outer_cv(x, y, params, c_params, cv_outer, cv_inner=None, n_jobs=n_jobs)
-        ncv.majority_feat_sel(x, y, all_preds, params, c_params, 5, model_out, pt_out)
+        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec))
+        #make sure y_p has the right labels
+        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec)
     f.close()
 if __name__=="__main__":
     #only testing
@@ -148,8 +163,12 @@ if __name__=="__main__":
     #cv_and_fs( bin=True, rec_based=True, model_out = "stol_2_NCBI20140115_candidatus_sample30/parsimony/models_g2_l1/", cv_inner = 5, cv_outer=5)
     if len(sys.argv) == 1:
         print """USAGE: python %s
+-y <data_f> phyletic patterns, i.e. one matrix with all the phenotypes 
 -d <input dir> with one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes 
--v <cross validation folds> the number of folds used for inner cross validation  
+-l <threshold:x,mode:<gain, loss, gain_loss>> only use if in reconstruction classification i.e. option -d is set as well, in that case -l means that we have parsimony reconstruction, this is followed by the options for the likelihood-based reconstruction e.g. -l threshold:0.5,mode:gain 
+-a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
+-b only use if in reconstruction classification i.e. option -d is set as well, in that case -b means that training is done on both the phyletic patterns and the parsimony / likelihood reconstruction 
+-v <inner cross validation folds> the number of folds used for inner cross validation  
 -i <inner cross validation folds> the number of folds used for inner cross validation if this option is given nested cross validation will be performed otherwise only feature selection routines will launched  
 -o <out dir> for the models, selected features etc. 
 -c <use counts> use raw data with normalization and don't binarize 
@@ -159,12 +178,16 @@ if __name__=="__main__":
         """ % (sys.argv[0])
         sys.exit(2)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "d:v:i:cj:g:p:o:")
+        optlist, args = getopt.getopt(sys.argv[1:], "y:d:l:a:bv:i:cj:g:p:o:")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
         sys.exit(2)
-    in_data = None
+    phypats_f = None
+    rec_dir = None
+    likelihood_params = None
+    parsimony_params = None
+    is_phypat_and_rec = False
     out = None
     cv_outer = None
     cv_inner = None
@@ -172,9 +195,20 @@ if __name__=="__main__":
     g1 = g2 = None
     pt1 = pt2 = None
     n_jobs = 1 
+
     for o, a in optlist:
         if o == "-d":
-            in_data = a
+            rec_dir = a
+        if o == "-y":
+            phypat_f = a
+        if o == "-l":
+            #parse likelihood option
+            likelihood_params =  dict(i.split(":") for i in a.strip().split(","))
+        if o == "-a":
+            #parse likelihood option
+            parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
+        if o == "-b":
+            is_phypat_and_rec = True
         if o == "-v":
             cv_outer = int(a)
         if o == "-i":
@@ -194,4 +228,4 @@ if __name__=="__main__":
                 sys.exit(1)
             else:
                 os.mkdir(out)
-    cv_and_fs(bin=binary, data_f = in_data, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs)
+    cv_and_fs(bin=binary, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs)
