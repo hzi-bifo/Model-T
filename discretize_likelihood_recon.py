@@ -52,6 +52,12 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None):
             m2[m2<t] = 0
             m = m1 + m2
             s = m.shape
+            #write to file all those samples that have been dropped due to unclear phenotype status
+            #TODO not yet tested
+            f = open(os.path.join(outdir, "%s_%s" %(m_f, "dropped_samples.txt")), 'w')
+            for i in m[~(drop_m1 & drop_m2 | (m.iloc[:,m.shape[1] - 1] >= 1))].index:
+                f.write("%s\n"%i)
+            f.close()
             #combine the two conditions
             m = m[drop_m1 & drop_m2 | (m.iloc[:,m.shape[1] - 1] >= 1)]
             print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
@@ -68,6 +74,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None):
                 #sys.stderr.write("matrix m1 and m2 incompatible with threshold %s\n"%t)
                 #raise Exception
             m.to_csv(os.path.join(outdir, m_f), sep="\t", header=None, index=True)
+            return m
 
 
 if __name__=="__main__":
@@ -81,6 +88,7 @@ if __name__=="__main__":
 -o <out dir> for the discretized matrices 
 -f <optional second directory> with gain or loss likelihood matrices that shall be combined with those given in the input dir specified by the -d option
         """ % (sys.argv[0])
+        sys.exit(1)
     try:
         optlist, args = getopt.getopt(sys.argv[1:], "d:t:o:f:")
     except getopt.GetoptError as err:
