@@ -6,8 +6,8 @@ import shutil
 import getopt
 import pandas as ps
 
-c_params = [0.1,1]
-#c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
+#c_params = [0.1,1]
+c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
 #c_params = [1,5,10,50,100]
 
 def write_miscl(miscl_plus,  model_out, pt_out):
@@ -126,7 +126,12 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             is_rec_based = True
         if not cv_inner is None:
             print y_p.index.values
-            all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, likelihood_params, parsimony_params, is_phypat_and_rec)))
+            try:
+                all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec)))
+            except ValueError as e:
+                print e
+                "pt %s has too few samples in one of the classes possibly, due to a high threshold in the likelihood reconstruction; try to lower the number of cross validation fold and run again"
+                continue
             #accuracy +1 class
             all_preds.index = y_p.index
             y_p_t = y_p.copy()
@@ -150,7 +155,7 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             write_miscl(miscl_plus, model_out, pt_out)
             f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
             f.flush()
-        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec))
+        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec))
         #make sure y_p has the right labels
         ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec)
     f.close()

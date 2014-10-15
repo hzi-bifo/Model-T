@@ -16,8 +16,9 @@ phyn_f = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_N
 event_f = "gainLossProbExpPerPosPerBranch.txt"
 
 
-def reconstruct_pt_likelihood(yp_train, likelihood_params):
+def reconstruct_pt_likelihood(yp_train, model_out, likelihood_params):
     """run gainLoss reconstruction for yp train"""
+    tmp_dir = os.path.join(model_out, "tmp_dir")
     if not os.path.exists(tmp_dir):
         os.mkdir(tmp_dir)
     else:
@@ -55,7 +56,7 @@ def reconstruct_pt_likelihood(yp_train, likelihood_params):
     #TODO set gainLoss option for automatic tree prunning
     command = ["%s %s/gainLoss_params.txt"%(gainLoss, tmp_dir )]
     with open(os.devnull, "w") as fnull:
-            result = subprocess.call(command, stdout = fnull, stderr = fnull, shell = True)
+            result = subprocess.call(command,  stdout = fnull, stderr = fnull, shell = True)
     #map pt events back to the treee
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "gain":
         b = beml.build_edge_matrix_likelihood(tree_l_f, "newick", "%s/pt_train.names.tsv"%tmp_dir, "%s/pt_train.tsv"%tmp_dir, "%s/RESULTS/%s"%(tmp_dir,event_f), use_likelihood = True, use_gain_events = True)
@@ -67,18 +68,26 @@ def reconstruct_pt_likelihood(yp_train, likelihood_params):
         os.mkdir(outdir_dlr)
         #gain events only case
         if likelihood_params["mode"] == "gain":
-            m = dlr(outdir_g, float(likelihood_params["threshold"]), outdir_dlr) 
+            if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")):
+                raise ValueError("Phenotype has no events associated with it")    
+            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr) 
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "loss":
         b = beml.build_edge_matrix_likelihood(tree_l_f, "newick", "%s/pt_train.names.tsv"%tmp_dir, "%s/pt_train.tsv"%tmp_dir, "%s/RESULTS/%s"%(tmp_dir,event_f), use_likelihood = True, use_gain_events = False)
         #create gain output dir
         outdir_l = "%s/loss/"%tmp_dir
         os.mkdir(outdir_l)
         b.get_all_edge_m(0,0,0,0, outdir_l)
+        outdir_dlr = "%s/discretized_loss"%tmp_dir
+        os.mkdir(outdir_dlr)
         #loss events only case
-        if likelihood_params["mode"] == "gain":
-            m = dlr(outdir_l, float(likelihood_params["threshold"]), outdir_dlr) 
+        if likelihood_params["mode"] == "loss":
+            if not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+                raise ValueError("Phenotype has no events associated with it")    
+            m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr) 
     if likelihood_params["mode"] == "gain_loss": 
         #gain and loss events combined
+        if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) or not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+            raise ValueError("Phenotype has no events associated with it")  
         outdir_dlr = "%s/discretized_gain_loss"%tmp_dir
         os.mkdir(outdir_dlr)
         m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l) 
