@@ -23,7 +23,12 @@ class build_edge_matrix:
         edges =[]
         #recurse through tree to get edges
         tl, tr = self.tree.seed_node.child_nodes()
-        self.get_edges_h( tl, tr,self.tree.seed_node, edges, pt)
+        root_update = self.get_edges_h( tl, tr,self.tree.seed_node, edges, pt)
+        if type(root_update) == type([]):
+            #the root is obsolete but needs to be kept
+            for e in edges:
+                if root_update[0] in e:
+                    e += root_update[1:(len(root_update))]
         return edges
 
     def get_edges_h(self, l, r,node, edges, pt):
@@ -41,14 +46,7 @@ class build_edge_matrix:
             return self.update(self.get_edges_h(ll, lr, l, edges, pt), self.get_edges_h(rl, rr,r , edges, pt), node, edges, pt)
 
 
-    def update(self, l, r,node, edges, pt):
-        #print type(node.taxon), type(l), type(r)
-        #if node.taxon.label == 'N14':
-        #    print l, r
-        #if  l1.taxon.label == 'N14':
-        #    print "links", l,r
-        #if  r1.taxon.label == 'N14':
-        #    print "rechts", l,r
+    def update(self, l, r, node, edges, pt):
         #both children stem from missing values (NAs)
         l1, r1 = node.child_nodes()
         if l is None and r is None:
@@ -80,10 +78,9 @@ class build_edge_matrix:
         #one node is list the other leave
         elif type(l) == type(node) and type(r) == type([]):
             if str(self.phy[l.taxon.label][pt]) not in self.missing_characters:
-                #r.append(r1.taxon.label)
                 r.append(node.taxon.label)
                 edges.append(r)
-                edges.append((l.taxon.label, node.taxon.label))
+                edges.append([l.taxon.label, node.taxon.label])
                 return True
             else:
                 r.append(node.taxon.label)
@@ -91,18 +88,15 @@ class build_edge_matrix:
         elif type(r) == type(node) and type(l) == type([]):
             if str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
                 l.append(node.taxon.label)
-                #l.append(node.taxon.label)
                 edges.append(l)
-                edges.append((r.taxon.label, node.taxon.label))
+                edges.append([r.taxon.label, node.taxon.label])
                 return True
             else:
                 l.append(node.taxon.label)
                 return l
         #both nodes derive from non NA nodes
         elif type(l) == type([]) and type(r) == type([]):
-            #l.append(l1.taxon.label)
             l.append(node.taxon.label)
-            #r.append(r1.taxon.label)
             r.append(node.taxon.label)
             edges.append(l)
             edges.append(r)
@@ -114,24 +108,24 @@ class build_edge_matrix:
                 #check if left node is leaf node
                 if type(l) == type(l1) and l.is_leaf():
                     if str(self.phy[l.taxon.label][pt]) not in self.missing_characters:
-                        edges.append((l.taxon.label, node.taxon.label))
-                        edges.append((r1.taxon.label, node.taxon.label))
+                        edges.append([l.taxon.label, node.taxon.label])
+                        edges.append([r1.taxon.label, node.taxon.label])
                         return True
-                    else: return [node.taxon.label, r1.taxon.label]
+                    else: return [ r1.taxon.label, node.taxon.label]
                 #check if left node is type list
                 elif type(l) == type([]):
                     l.append(node.taxon.label)
                     #l.append(node.taxon.label)
                     edges.append(l)
-                    edges.append((r1.taxon.label, node.taxon.label))
+                    edges.append([r1.taxon.label, node.taxon.label])
                     return True
             #check if right node is either type node or list of nodes
             elif type(r) != type(True):
                 #check if right node is leave node
                 if type(r) == type(r1) and r.is_leaf():
                     if str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
-                        edges.append((r.taxon.label, node.taxon.label))
-                        edges.append((l1.taxon.label, node.taxon.label))
+                        edges.append([r.taxon.label, node.taxon.label])
+                        edges.append([l1.taxon.label, node.taxon.label])
                         return True
                     else: return [l1.taxon.label, node.taxon.label]
                 #check if right node is type list
@@ -139,17 +133,18 @@ class build_edge_matrix:
                     #r.append(r1.taxon.label)
                     r.append(node.taxon.label)
                     edges.append(r)
-                    edges.append((l1.taxon.label, node.taxon.label))
+                    edges.append([l1.taxon.label, node.taxon.label])
                     return True
             else:
-                edges.append((l1.taxon.label,node.taxon.label))
-                edges.append((r1.taxon.label, node.taxon.label))
+                edges.append([l1.taxon.label,node.taxon.label])
+                edges.append([r1.taxon.label, node.taxon.label])
                 return True
         #both nodes are leave nodes
         elif l.is_leaf() and r.is_leaf():
             if str(self.phy[l.taxon.label][pt]) not in self.missing_characters and str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
-                edges.append((l.taxon.label,node.taxon.label))
-                edges.append((r.taxon.label,node.taxon.label))
+                #print str(self.phy[l.taxon.label][pt])
+                edges.append([l.taxon.label,node.taxon.label])
+                edges.append([r.taxon.label,node.taxon.label])
                 return True
             elif str(self.phy[l.taxon.label][pt]) not in self.missing_characters:
                 return [l.taxon.label, node.taxon.label]
@@ -191,7 +186,7 @@ class build_edge_matrix:
         for e in edges:
             edge2char2val[tuple(e)] = {}
         #map/match genotype to phenotype edges
-        for gt in range(gt_start, gt_end+1):
+        for gt in range(gt_start, gt_end):
             #TODO account for what happen if there are no events
             if not gt in char2ev:
                 continue
@@ -221,7 +216,7 @@ class build_edge_matrix:
         #account for phenotype edges
         #print "edge2char2val", edge2char2val
         for ev in char2ev[pt]:
-            print ev
+            #print ev
             edge1 = node2edge[ev[0]]
             edge2 = node2edge[ev[1]]
             isn = edge1.intersection(edge2).pop()
@@ -235,7 +230,7 @@ class build_edge_matrix:
         out_fo = open(out_f, 'w')
         for e in edges:
             s="%s\t"%str("_".join(e))
-            for gt in range(gt_start, gt_end+1):
+            for gt in range(gt_start, gt_end):
                 if gt in edge2char2val[tuple(e)]:
                     s+="%s\t"%edge2char2val[tuple(e)][gt]
                 else:
@@ -255,6 +250,7 @@ class build_edge_matrix:
             print "current phenotype number being processed", pt
             edges = self.get_edges(pt)
             pt_dict = self.get_pt_dict(edges)
+            #plus one because we want to include column gt_end
             edge2char2val =self.map_events(pt_dict, gt_start, gt_end + 1, self.char2ev,pt, edges)
             self.get_edge_m(edge2char2val, edges, gt_start, gt_end + 1, pt, "%s/pt%s.dat"%(out_dir,pt))
 
