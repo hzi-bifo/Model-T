@@ -15,13 +15,14 @@ def single_matrix(m, f,  t, outdir):
     print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
     print "there were %s samples removed due to unclear status" % (s[0] - m.shape[0])
     m.to_csv(os.path.join(outdir, f), sep="\t", header=None, index=True)
+    return m
 
 def threshold_matrix(dir1, t, outdir, loss_dir2=None):
     """discretize one or combine two matrices into one discretized matrix"""
     if loss_dir2 is None:
         for f1 in os.listdir(dir1):
             m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0, header=None) 
-            single_matrix(m1, f1, t, outdir)
+            return single_matrix(m1, f1, t, outdir)
 
     if not loss_dir2 is None:
         m_set = set(os.listdir(dir1)) | set(os.listdir(loss_dir2))
@@ -31,13 +32,13 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None):
             else: 
                 #no gain event file found, go into single matrix case
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
-                single_matrix(m2, m_f, t, outdir)
+                return single_matrix(m2, m_f, t, outdir)
                 continue 
             if os.path.isfile(os.path.join(loss_dir2, m_f)):
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
             else: 
                 #no loss event file found, go into single matrix case
-                single_matrix(m1, m_f, t, outdir)
+                return single_matrix(m1, m_f, t, outdir)
                 continue
             print "processing file %s/%s"%(loss_dir2, m_f)
             #drop condition for m1 where the pt is non-zero but does not exceed the threshold
