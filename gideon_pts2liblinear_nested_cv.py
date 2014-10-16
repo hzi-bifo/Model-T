@@ -8,6 +8,10 @@ import pandas as ps
 
 #c_params = [0.1,1]
 c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
+MIN_POS = 10
+MIN_NEG = 10
+MIN_SAMPLES = 20
+params = {'loss':'l2', 'tol':0.000001, 'penalty':'l1', 'dual':False, 'fit_intercept':True, 'intercept_scaling':1, 'class_weight':'auto', 'random_state':1}
 #c_params = [1,5,10,50,100]
 
 def write_miscl(miscl_plus,  model_out, pt_out):
@@ -44,6 +48,14 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
         out_f.write("C_params\n")
         for c in c_params:
             out_f.write("%s\n"%c)
+    with open("%s/configuration.txt" % model_out, 'w') as out_f:
+        out_f.write("MIN_POS\t%s\n
+                MIN_NEG\t%s\n
+                %sMIN_SAMPLES\t%s\n
+                'tol\t%s\n
+                'fit_intercept\t%s\n
+                'class_weight\t%s\n
+                'random_state\t%s\n"%(MIN_POS, MIN_NEG, MIN_SAMPLES,  params['tol'], params['fit_intercept'], params['class_weight'], params['randome_sate']))
     #read in phyletic patterns
     p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0, header = None)
     f = open("%s/cv_acc.txt"%model_out, "w")
@@ -109,16 +121,19 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
         #y = np.concatenate((y[pos_class], y[neg_class[0:30]]))
         #end experiment
         #skip phenotypes with too little samples
-        if len(y) <= 30:
+        #in case of joint phyletic pattern and reconstruction-based classification, sum up observations
+        y_join = y.copy()
+        if is_phypat_and_rec:
+            y_join =  y_join.append(y_p)
+        if len(y_join) < MIN_SAMPLES:
             print "skipping pt %s with only %s observations"%(pt_out,len(y))
             continue
-        if sum(y==+1) < 10:
+        if sum(y_join==+1) < MIN_POS:
             print "skipping pt %s with only %s + observations"%(pt_out,sum(y==+1))
             continue
-        if sum(y==-1) < 10:
+        if sum(y_join==-1) < MIN_NEG:
             print "skipping pt %s with only %s - observations"%(pt_out,sum(y==-1))
             continue
-        params = {'loss':'l2', 'tol':0.000001, 'penalty':'l1', 'dual':False, 'fit_intercept':True, 'intercept_scaling':1, 'class_weight':'auto', 'random_state':1}
         print "pt_out", pt, "with", sum(y==+1), "positive samples and", sum(y==-1), "negative samples"
         #check if we want to do nested cross validation accuracy estimation
         is_rec_based = False
@@ -145,8 +160,7 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             #balanced accuracy
             bacc = ncv.bacc(pos_acc, neg_acc)
             print "balanced acc", bacc
-            #TODO write misclassified samples to disk
-            #get misclassified samples
+            #TODO get misclassified reconstructions samples
             miscl = y_p_t.index[(all_preds != y_p_t)]
             #bind actual labels and predictions
             print miscl, y_p_t.loc[miscl], all_preds.loc[miscl]
