@@ -53,7 +53,7 @@ def reconstruct_pt_likelihood(yp_train, model_out, likelihood_params):
     g.close()
     h.close()
     #execute gainLoss for that phenotype 
-    #TODO set gainLoss option for automatic tree prunning
+    #TODO consider setting gainLoss option for automatic tree prunning
     command = ["%s %s/gainLoss_params.txt"%(gainLoss, tmp_dir )]
     with open(os.devnull, "w") as fnull:
             result = subprocess.call(command,  stdout = fnull, stderr = fnull, shell = True)
@@ -70,7 +70,7 @@ def reconstruct_pt_likelihood(yp_train, model_out, likelihood_params):
         if likelihood_params["mode"] == "gain":
             if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")):
                 raise ValueError("Phenotype has no events associated with it")    
-            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr) 
+            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "loss":
         b = beml.build_edge_matrix_likelihood(tree_l_f, "newick", "%s/pt_train.names.tsv"%tmp_dir, "%s/pt_train.tsv"%tmp_dir, "%s/RESULTS/%s"%(tmp_dir,event_f), use_likelihood = True, use_gain_events = False)
         #create gain output dir
@@ -83,14 +83,14 @@ def reconstruct_pt_likelihood(yp_train, model_out, likelihood_params):
         if likelihood_params["mode"] == "loss":
             if not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
                 raise ValueError("Phenotype has no events associated with it")    
-            m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr) 
+            m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
     if likelihood_params["mode"] == "gain_loss": 
         #gain and loss events combined
         if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) or not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
             raise ValueError("Phenotype has no events associated with it")  
         outdir_dlr = "%s/discretized_gain_loss"%tmp_dir
         os.mkdir(outdir_dlr)
-        m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l) 
+        m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l, is_internal = True) 
     return m
 
 

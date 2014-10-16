@@ -17,12 +17,14 @@ def single_matrix(m, f,  t, outdir):
     m.to_csv(os.path.join(outdir, f), sep="\t", header=None, index=True)
     return m
 
-def threshold_matrix(dir1, t, outdir, loss_dir2=None):
+def threshold_matrix(dir1, t, outdir, loss_dir2=None, is_internal = False):
     """discretize one or combine two matrices into one discretized matrix"""
     if loss_dir2 is None:
         for f1 in os.listdir(dir1):
             m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0, header=None) 
-            return single_matrix(m1, f1, t, outdir)
+            m =  single_matrix(m1, f1, t, outdir)
+            if is_internal:
+                return m
 
     if not loss_dir2 is None:
         m_set = set(os.listdir(dir1)) | set(os.listdir(loss_dir2))
@@ -32,13 +34,17 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None):
             else: 
                 #no gain event file found, go into single matrix case
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
-                return single_matrix(m2, m_f, t, outdir)
+                m =  single_matrix(m2, m_f, t, outdir)
+                if is_internal:
+                    return m
                 continue 
             if os.path.isfile(os.path.join(loss_dir2, m_f)):
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
             else: 
                 #no loss event file found, go into single matrix case
-                return single_matrix(m1, m_f, t, outdir)
+                m = single_matrix(m1, m_f, t, outdir)
+                if is_internal:
+                    return m
                 continue
             print "processing file %s/%s"%(loss_dir2, m_f)
             #drop condition for m1 where the pt is non-zero but does not exceed the threshold
@@ -74,8 +80,10 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None):
                 #        print m2.loc[i][m2.loc[i] > t]
                 #sys.stderr.write("matrix m1 and m2 incompatible with threshold %s\n"%t)
                 #raise Exception
+            #TODO only write to file if the call is external i.e. in the bulk discretization run
             m.to_csv(os.path.join(outdir, m_f), sep="\t", header=None, index=True)
-            return m
+            if is_internal:
+                return m
 
 
 if __name__=="__main__":
