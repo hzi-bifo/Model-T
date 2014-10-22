@@ -10,6 +10,7 @@ from joblib import Parallel, delayed, load, dump
 #TODO use the sklearn version of joblib instead to remove the direct joblib dependency
 from operator import itemgetter
 import math
+import random
 import cv_rec_helper as crh 
 import sys
 import itertools
@@ -57,24 +58,35 @@ def bacc(pos_acc, neg_acc):
     """compute balanced accuracy"""
     return float(pos_acc + neg_acc)/2
 
-def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec):
+def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec, perc_feats, no_classifier = 10):
     """train model on given training features and target and return the predicted labels for the left out samples"""
     #set y negative labels to -1
     y_train_t = y_train.copy() 
     y_train_t[y_train_t == 0] = -1
+    yp_train_t = yp_train.copy() 
+    yp_train_t[yp_train_t == 0] = -1
     predictor = svm.LinearSVC(C=C)
     predictor.set_params(**params)
-    if is_phypat_and_rec:
-        yp_train_t = yp_train.copy() 
-        yp_train_t[yp_train_t == 0] = -1
-        predictor.fit(ps.concat([x_train, xp_train], axis = 0), ps.concat([y_train_t, yp_train_t], axis = 0))
-    else:
-        predictor.fit(x_train,y_train_t)
-    #print predictor.get_params()
-    #print predictor.transform(x).shape
-    #test on left out fold
-    preds = predictor.predict(x_test)
-    return preds
+    #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
+    if perc_feats == 1.0:
+        no_classifier = 1
+    all_preds = ps.DataFrame(np.zeros(shape = (x_test.shape[0], no_classifier)))
+    for i in range(no_classifier):
+        #select a subset of features for classification
+        sample = sorted(random.sample(x_train.columns, int(math.floor(x_train.shape[1] * perc_feats))))
+        #reduce feature space to the selected features
+        x_train_sub = x_train.loc[:, sample]
+        if is_phypat_and_rec:
+            #reduce xp feature space to the selected features
+            xp_train_sub = xp_train.loc[:, sample]
+            predictor.fit(ps.concat([x_train_sub, xp_train_sub], axis = 0), ps.concat([y_train_t, yp_train_t], axis = 0))
+        else: 
+            predictor.fit(x_train_sub, y_train_t)
+        
+        all_preds.iloc[:, i]  = predictor.predict(x_test.loc[:, sample])
+    #do majority vote to aggregate predictions
+    aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
+    return aggr_preds 
 
 def get_training_and_testing_mapping(train_pt_edges, all_pt_edges):
     """map phenotype edges that are not in the full reconstruction and thus must have been joined"""
@@ -126,8 +138,8 @@ def get_rec_samples(x_r, y_r, yp_train, model_out, likelihood_params, parsimony_
         m = crh.reconstruct_pt_likelihood(yp_train, model_out, likelihood_params)
     all_pt_edges = set(x_r.index)
     train_pt_edges = set(m.index)
-    print len(all_pt_edges), "anzahl aller reconstruction samples"
-    print len(train_pt_edges), "anzahl aller reconstruction samples ohne test samples"
+    #print len(all_pt_edges), "anzahl aller reconstruction samples"
+    #print len(train_pt_edges), "anzahl aller reconstruction samples ohne test samples"
     #print yp_train.index.values, "training samples"
     #all edges only present in the full reconstruction
     df1 = all_pt_edges.difference(train_pt_edges)
@@ -160,10 +172,10 @@ def get_rec_samples(x_r, y_r, yp_train, model_out, likelihood_params, parsimony_
     return x_r_train, y_r_train, x_r_test, y_r_test
 
 
-def setup_folds(x, y, cv, rec_dir, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec):
+def setup_folds(x, y, cv, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec):
     """prepare all combinations of training and test folds, either for the standard phyletic pattern or the likelihood / parsimony reconstruction case or for the combined case"""
     pfolds = setup_folds_phypat(x_p, y_p, cv)
-    if rec_dir is None:
+    if not is_rec_based:
         #standard phyletic pattern cv
         return pfolds
     else:
@@ -185,63 +197,58 @@ def setup_folds_phypat(x, y, cv):
     folds = []
     for i in range(fold_l_e):
         index = range(i*(fold_l+1), i*(fold_l+1)+fold_l+1)
-        print x.shape, "phyletic pattern shape before removing test samples"
+        #print x.shape, "phyletic pattern shape before removing test samples"
         x_train = x.drop(x.index[index])
-        print x_train.shape, "phyletic pattern shape after removing test samples"
+        #print x_train.shape, "phyletic pattern shape after removing test samples"
         x_test = x.iloc[index,:]
         y_train = y.drop(y.index[index])
-        folds.append((x_train, y_train, x_test, None, None, None, None))
+        folds.append((x_train, y_train, x_test, None, x_train, y_train, x_test))
     n_e = fold_l_e * (fold_l+1)
     for i in range(cv - fold_l_e):
         index = range(n_e + fold_l*i, n_e + fold_l*i + fold_l)
         x_train = x.drop(x.index[index])
         x_test = x.iloc[index,:]
         y_train = y.drop(y.index[index])
-        folds.append((x_train, y_train, x_test, None, None, None, None))
+        folds.append((x_train, y_train, x_test, None, x_train, y_train, x_test))
     return folds
 
 
 
-def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec):
+def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec, perc_feats):
     """do a cross validation with cv_outer folds
     if only cv_outer is given do a cross validation for each value of the paramter C given
     if cv_inner is given, do a nested cross validation optimizing the paramter C in the inner loop"""
     #do n fold cross validation
     #number of elements in each invidual fold
     if not cv_inner is None:
-
         ofolds = setup_folds(x, y, cv_outer, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec)
         ocv_preds = []
         for x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test  in ofolds:
             ifolds = setup_folds(x_train, y_train, cv_inner,  is_rec_based, xp_train, yp_train, model_out, likelihood_params, parsimony_params, is_phypat_and_rec)
-            all_preds = np.zeros(shape=[len(y_train), len(c_params)])
+            all_preds = ps.DataFrame(np.zeros(shape=[len(yp_train), len(c_params)]))
+            all_preds.columns = c_params
+            all_preds.index = yp_train.index
             #do inner cross validation
             preds = []
-            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train,xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec)
-                    for (x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
+            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats)
+                    for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
                         in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(c_params)))):
-                preds += list(pred)
-            all_preds =  np.array(preds)
-            all_preds_r = ps.DataFrame(np.resize(all_preds, (len(yp_train), len(c_params))))
-            all_preds_r.index = yp_train.index
-            #print all_preds_r, "all_preds_r"
+                preds.append(list(pred))
+            preds_ordered = [[] for i in range(len(c_params))]
+            for i in range(len(preds)):
+                preds_ordered[i % len(c_params)] += preds[i]
+            all_preds = ps.DataFrame(np.array(preds_ordered), index = c_params, columns = yp_train.index).T
             #determine C param with the best accuracy
             #copy yp train and change the negative labels from 0 to -1
             yp_t_t = yp_train.copy()
             yp_t_t[yp_t_t == 0] = -1
-            baccs = [bacc(recall_pos(yp_t_t, all_preds_r.iloc[:,j]), recall_neg(yp_t_t, all_preds_r.iloc[:,j])) for j in range(len(c_params))]
+            baccs = [bacc(recall_pos(yp_t_t, all_preds.iloc[:,j]), recall_neg(yp_t_t, all_preds.iloc[:,j])) for j in range(len(c_params))]
+            print baccs, "baccs"
             c_opt = c_params[np.argmax(np.array(baccs))]
+            print c_opt
             #use that C param to train a classifier to predict the left out samples in the outer cv
-            predictor = svm.LinearSVC(C=c_opt)
-            predictor.set_params(**params)
-            y_t_t = y_train.copy()
-            y_t_t[y_t_t == 0] = -1
-            if is_phypat_and_rec:
-                predictor.fit(ps.concat([x_train, xp_train], axis = 0), ps.concat([y_t_t, yp_t_t], axis = 0))
-            else:
-                predictor.fit(x_train, y_t_t)
-            p = list(predictor.predict(xp_test))
-            ocv_preds +=p
+            p = cv(x_train, y_train, xp_train, yp_train, xp_test, params , c_opt, is_phypat_and_rec, perc_feats, no_classifier = 10)
+            ocv_preds += list(p)
         return ocv_preds
 
     folds = setup_folds(x, y, cv_outer, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params,is_phypat_and_rec)
@@ -253,18 +260,16 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
     #TODO think about assigning the folds randomly to shuffle the input data
     for j in range(len(c_params)):
         preds = []
-        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec)
+        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, no_classifier = 10)
                 for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
             preds += list(pred)
         all_preds[:,j] = preds
     return all_preds
 
 
-def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out, pt_out, is_phypat_and_rec):
+def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out, pt_out, is_phypat_and_rec, perc_feats, no_classifier = 10):
     """determine the features occuring in the majority of the k best models"""
     #determine the k best classifiers
-    #print all_preds, "all_preds"
-    #print ps.concat([x, x_p], axis = 0), ps.concat([y, y_p], axis = 0)
     all_preds.index = y_p.index
     x.columns = x_p.columns
     y_p_t = y_p.copy()
@@ -275,40 +280,53 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
     recps = [recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(c_params))]
     recns = [recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(c_params))]
     baccs_s = sorted(((baccs[i], recps[i], recns[i], c_params[i]) for i in range(len(c_params))), key=itemgetter(0), reverse=True )
-    models = np.zeros(shape=(x.shape[1], k))
     predictors = []
+    #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
+    if perc_feats == 1.0:
+        no_classifier = 1
+    models = np.zeros(shape=(x.shape[1], k * no_classifier))
     for i in range(k):
         predictor = svm.LinearSVC(C=baccs_s[i][3])
         predictor.set_params(**params)
-        if is_phypat_and_rec:
-            predictor.fit(ps.concat([x, x_p], axis = 0), ps.concat([y_t, y_p_t], axis = 0))
-        else:
-            predictor.fit(x, y_t)
-        predictors.append(predictor)
-        #save the model
-        models[:,i] = predictor.coef_
+        sample = random.sample(x.columns, int(math.floor(x.shape[1] * perc_feats)))
+        for l in range(no_classifier):
+            x_sub = x.loc[:, sample]
+            if is_phypat_and_rec:
+                x_p_sub = x_p.loc[:, sample]
+                predictor.fit(ps.concat([x_sub, x_p_sub], axis = 0), ps.concat([y_t, y_p_t], axis = 0))
+            else:
+                predictor.fit(x_sub, y_t)
+                #save the model
+            predictors.append(predictor)
+            models[[np.array(sample) - 1], i * no_classifier + l] = predictor.coef_
     feats = []
     #determine the majority features
     for i in range(models.shape[0]):
+        #print models.shape[1], 'number of classifiers'
+        #print math.ceil(k/2.0), 'threshold'
         if sum(models[i,:] > 0) >= math.ceil(k/2.0):
             feats.append(i)
-
     rownames = [baccs_s[i][3] for i in range(k)] 
     colnames = ['bacc', "pos_rec", "neg_rec"]
     baccs_s_np = np.array(baccs_s)[0:k,0:3].T
     baccs_s_np_p = ps.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
     ps.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
     #write majority features with their weights to disk
+    #print feats
     id2pf = ps.DataFrame(get_pfam_names_and_descs(feats))
     models_df = ps.DataFrame(models)
     for i in range(k):
         models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
     feat_df = ps.concat([id2pf.loc[:, feats], models_df.T.loc[:, feats]], axis = 0).T
-    feat_df.columns = ["Pfam_acc", "Pfam_desc"] + rownames
-    columns_out = ["Pfam_acc"] + rownames + ["Pfam_desc"]
-    feat_df.to_csv("%s/%s_majority_features.txt"%(model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+    rownames_extd = [str(baccs_s[i][3]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
+    feat_df.columns = ["Pfam_acc", "Pfam_desc"] + rownames_extd
+    columns_out = ["Pfam_acc"] + rownames_extd + ["Pfam_desc"]
+    feat_df.to_csv("%s/%s_majority_features+weights.txt"%(model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+    id2pf.index = ("Pfam_acc", "Pfam_desc")
+    id2pf.loc[:, feats].T.to_csv("%s/%s_majority_features.txt"%(model_out,pt_out), float_format='%.3f',  sep = "\t")
     #write coefficient matrix to disk
-    ps.DataFrame(models).to_csv("%s/%s_feats.txt"%(model_out,pt_out), sep="\t", header=c_params[0:k])
+    #put column names
+    ps.DataFrame(models).to_csv("%s/%s_feats.txt"%(model_out,pt_out), sep="\t")
     #pickle the predictors
     dump(predictors, '%s/pickled/%s_predictors.pkl'%(model_out,pt_out))
 

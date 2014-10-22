@@ -6,8 +6,9 @@ import shutil
 import getopt
 import pandas as ps
 
-#c_params = [0.1,1]
-c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1]
+#c_params = [0.05, 0.05]
+#c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1, 3, 7, 10]
+c_params = [0.02, 0.03, 0.05, 0.07, 0.1, 0.3, 0.5, 0.7, 1]
 MIN_POS = 10
 MIN_NEG = 10
 MIN_SAMPLES = 20
@@ -28,7 +29,7 @@ def write_miscl(miscl_plus,  model_out, pt_out):
 
 
 
-def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1):
+def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_feats = 1.0):
     #create output directory if not already existing, append input parameter specific suffices
     #model_out = "%s/%s_%s"%(model_out, "bin" if bin else "counts", "recbased" if os.path.isdir(data_f) else "phypat")
     #if not os.path.exists(model_out):
@@ -49,13 +50,7 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
         for c in c_params:
             out_f.write("%s\n"%c)
     with open("%s/configuration.txt" % model_out, 'w') as out_f:
-        out_f.write("MIN_POS\t%s\n
-                MIN_NEG\t%s\n
-                %sMIN_SAMPLES\t%s\n
-                'tol\t%s\n
-                'fit_intercept\t%s\n
-                'class_weight\t%s\n
-                'random_state\t%s\n"%(MIN_POS, MIN_NEG, MIN_SAMPLES,  params['tol'], params['fit_intercept'], params['class_weight'], params['randome_sate']))
+        out_f.write("""MIN_POS\t%s\nMIN_NEG\t%s\nMIN_SAMPLES\t%s\ncv_inner\t%s\ncv_outer\t%s\ntol\t%s\nfit_intercept\t%s\nclass_weight\t%s\nrandom_state\t%s\n"""%(MIN_POS, MIN_NEG, MIN_SAMPLES, cv_outer, cv_inner, params['tol'], params['fit_intercept'], params['class_weight'], params['random_state']))
     #read in phyletic patterns
     p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0, header = None)
     f = open("%s/cv_acc.txt"%model_out, "w")
@@ -84,6 +79,10 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             pt = a.shape[1] - 1 
             x = a.iloc[:, gt_start:gt_end+1]
             y = a.iloc[:, pt]
+        else:
+            #we are in pure phyletic pattern mode
+            x = x_p
+            y = y_p
         if bin:
             x_p = (x_p > 0).astype('int')
             x = (x > 0).astype('int')
@@ -93,10 +92,6 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             #TODO what about reconstruction case??
             #TODO if this goes alright
             np.savetxt(fname="%s/%s_normf.dat"%(model_out, pt_out), X=nf)
-        if rec_dir is None:
-            #we are in pure phyletic pattern mode
-            x = x_p
-            y = y_p
              
         #experiment: add inverse features
         #x_inv = x.copy()
@@ -126,32 +121,33 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
         if is_phypat_and_rec:
             y_join =  y_join.append(y_p)
         if len(y_join) < MIN_SAMPLES:
-            print "skipping pt %s with only %s observations"%(pt_out,len(y))
+            print "skipping pt %s with only %s observations"%(pt_out,len(y_join))
             continue
         if sum(y_join==+1) < MIN_POS:
-            print "skipping pt %s with only %s + observations"%(pt_out,sum(y==+1))
+            print "skipping pt %s with only %s + observations"%(pt_out,sum(y_join==+1))
             continue
         if sum(y_join==-1) < MIN_NEG:
-            print "skipping pt %s with only %s - observations"%(pt_out,sum(y==-1))
+            print "skipping pt %s with only %s - observations"%(pt_out,sum(y_join==-1))
             continue
-        print "pt_out", pt, "with", sum(y==+1), "positive samples and", sum(y==-1), "negative samples"
+        print "pt_out", pt, "with", sum(y_join==+1), "positive samples and", sum(y_join==-1), "negative samples"
         #check if we want to do nested cross validation accuracy estimation
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
         if not cv_inner is None:
-            print y_p.index.values
             try:
-                all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec)))
+                all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec, perc_feats)))
             except ValueError as e:
+                import traceback
+                print traceback.print_exc(e)
                 print e
-                "pt %s has too few samples in one of the classes possibly, due to a high threshold in the likelihood reconstruction; try to lower the number of cross validation fold and run again"
+                print "pt %s has too few samples in one of the classes possibly, due to a high threshold in the likelihood reconstruction; try to lower the number of cross validation fold and run again"
                 continue
             #accuracy +1 class
             all_preds.index = y_p.index
             y_p_t = y_p.copy()
             y_p_t[y_p_t == 0] = -1
-            print all_preds, y_p_t, "y_p and all preds nested cv"
+            #print all_preds, y_p_t, "y_p and all preds nested cv"
             pos_acc = ncv.recall_pos(y_p_t, all_preds)
             print "pos_acc", pos_acc
             #accuracy -1 class
@@ -163,15 +159,15 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             #TODO get misclassified reconstructions samples
             miscl = y_p_t.index[(all_preds != y_p_t)]
             #bind actual labels and predictions
-            print miscl, y_p_t.loc[miscl], all_preds.loc[miscl]
+            #print miscl, y_p_t.loc[miscl], all_preds.loc[miscl]
             miscl_plus = ps.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
-            print miscl_plus
+            #print miscl_plus
             write_miscl(miscl_plus, model_out, pt_out)
             f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
             f.flush()
-        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec))
+        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, perc_feats = perc_feats))
         #make sure y_p has the right labels
-        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec)
+        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec, perc_feats = perc_feats)
     f.close()
 if __name__=="__main__":
     #only testing
@@ -194,15 +190,16 @@ if __name__=="__main__":
 -j <number of jobs> that shall be used
 -g <range of genotypes> e.g. 1-8400
 -p <range of phenotypes> to consider e.g 8550-8560
+-r <percentage of features> to to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included
         """ % (sys.argv[0])
         sys.exit(2)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "y:d:l:a:bv:i:cj:g:p:o:")
+        optlist, args = getopt.getopt(sys.argv[1:], "y:d:l:a:bv:i:cj:g:p:o:r:")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
         sys.exit(2)
-    phypats_f = None
+    phypat_f = None
     rec_dir = None
     likelihood_params = None
     parsimony_params = None
@@ -214,6 +211,7 @@ if __name__=="__main__":
     g1 = g2 = None
     pt1 = pt2 = None
     n_jobs = 1 
+    perc_feats = 1.0
 
     for o, a in optlist:
         if o == "-d":
@@ -247,4 +245,6 @@ if __name__=="__main__":
                 sys.exit(1)
             else:
                 os.mkdir(out)
-    cv_and_fs(bin=binary, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs)
+        if o == "-r":
+            perc_feats = float(a)
+    cv_and_fs(bin=binary, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_feats = perc_feats)
