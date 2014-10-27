@@ -4,7 +4,7 @@ import pandas
 import sys
 import numpy as np
 
-def single_matrix(m, f,  t, discretize_pt_only, outdir):
+def single_matrix(m, f,  t,  outdir, discretize_pt_only = False):
     """discretize a single matrix""" 
     print "processing file %s"%(f)
     if discretize_pt_only:
@@ -27,7 +27,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
     if loss_dir2 is None:
         for f1 in os.listdir(dir1):
             m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0, header=None) 
-            m =  single_matrix(m1, f1, t,  discretize_pt_only, outdir)
+            m =  single_matrix(m1, f1, t,   outdir, discretize_pt_only = discretize_pt_only)
             if is_internal:
                 return m
 
@@ -39,7 +39,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
             else: 
                 #no gain event file found, go into single matrix case
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
-                m =  single_matrix(m2, m_f, t,  discretize_pt_only, out_dir)
+                m =  single_matrix(m2, m_f, t, outdir, discretize_pt_only = discretize_pt_only)
                 if is_internal:
                     return m
                 continue 
@@ -47,7 +47,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
             else: 
                 #no loss event file found, go into single matrix case
-                m = single_matrix(m1, m_f, t, discretize_pt_only,  outdir)
+                m = single_matrix(m1, m_f, t, outdir, discretize_pt_only = discretize_pt_only)
                 if is_internal:
                     return m
                 continue
@@ -58,7 +58,8 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
             if discretize_pt_only:
                 m1.loc[m1.iloc[:, m1.shape[1] - 1] >= t, m1.shape[1]] = 1
                 m2.loc[m2.iloc[:, m2.shape[1] - 1] >= t, m2.shape[1]] = 1
-                m = m1 + (1 - m1)*m2 
+                m = m1 + (1 - m1) * m2 
+                print m.iloc[:, m.shape[1] - 1]
             else:
                 m1[m1>=t] = 1
                 m1[m1<t] = 0

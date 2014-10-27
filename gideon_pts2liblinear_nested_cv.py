@@ -88,10 +88,12 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             x = (x > 0).astype('int')
         else:
             x_p, nf = ncv.normalize(x.astype('double'))
+            np.savetxt(fname="%s/%s_normf_xp.dat"%(model_out, pt_out), X=nf)
+            x, nf = ncv.normalize(x.astype('double'))
+            np.savetxt(fname="%s/%s_normf_x.dat"%(model_out, pt_out), X=nf)
             #save the normalization factors to disk for later testing
             #TODO what about reconstruction case??
             #TODO if this goes alright
-            np.savetxt(fname="%s/%s_normf.dat"%(model_out, pt_out), X=nf)
              
         #experiment: add inverse features
         #x_inv = x.copy()
