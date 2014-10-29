@@ -14,6 +14,7 @@ import random
 import cv_rec_helper as crh 
 import sys
 import itertools
+import sklearn.preprocessing as preprocessing
 
 def normalize(array):
     #TODO check normalization procedure
@@ -32,6 +33,9 @@ def normalize(array):
     cs[cs==0] = 1000
     array_rs_cs = array_rs/cs
     #print np.max(array_rs_cs,0)
+    #scaler = preprocessing.StandardScaler(with_mean = False, with_std = True).fit(array)
+    #transformed = ps.DataFrame(data = scaler.transform(array), index = array.index, columns = array.columns)
+    #return transformed, scaler.std_
     return  array_rs_cs, cs
 
 
