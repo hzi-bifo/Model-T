@@ -85,7 +85,8 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             y = y_p
         if bin:
             x_p = (x_p > 0).astype('int')
-            x = (x > 0).astype('int')
+            if likelihood_params is None:
+                x = (x > 0).astype('int')
         else:
             x_p, nf = ncv.normalize(x.astype('double'))
             np.savetxt(fname="%s/%s_normf_xp.dat"%(model_out, pt_out), X=nf)
@@ -117,21 +118,25 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
         #x_bin = np.concatenate((x_bin[pos_class,:] , x_bin[neg_class[0:30],:]), axis=0)
         #y = np.concatenate((y[pos_class], y[neg_class[0:30]]))
         #end experiment
+        #check if we are in likelihood mode and y consists of target probabilities instead of discrete values
+            #TODO sample restrictions don't hold anymore when doubling the data set
+            #TODO all class 0 and class 1 samples are contingiuos in the input, shuffle or make 0,1,0,1
         #skip phenotypes with too little samples
         #in case of joint phyletic pattern and reconstruction-based classification, sum up observations
+        print y
         y_join = y.copy()
         if is_phypat_and_rec:
             y_join =  y_join.append(y_p)
         if len(y_join) < MIN_SAMPLES:
             print "skipping pt %s with only %s observations"%(pt_out,len(y_join))
             continue
-        if sum(y_join==+1) < MIN_POS:
-            print "skipping pt %s with only %s + observations"%(pt_out,sum(y_join==+1))
+        if sum(y_join > 0) < MIN_POS:
+            print "skipping pt %s with only %s + observations"%(pt_out,sum(y_join>0))
             continue
         if sum(y_join==-1) < MIN_NEG:
             print "skipping pt %s with only %s - observations"%(pt_out,sum(y_join==-1))
             continue
-        print "pt_out", pt, "with", sum(y_join==+1), "positive samples and", sum(y_join==-1), "negative samples"
+        print "pt_out", pt, "with", sum(y_join>0), "positive samples and", sum(y_join==-1), "negative samples"
         #check if we want to do nested cross validation accuracy estimation
         is_rec_based = False
         if not rec_dir is None:
@@ -169,7 +174,7 @@ def cv_and_fs(bin, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_
             f.flush()
         all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, perc_feats = perc_feats))
         #make sure y_p has the right labels
-        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec, perc_feats = perc_feats)
+        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec, perc_feats = perc_feats, likelihood_params = likelihood_params)
     f.close()
 if __name__=="__main__":
     #only testing

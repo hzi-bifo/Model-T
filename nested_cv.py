@@ -16,6 +16,33 @@ import sys
 import itertools
 import sklearn.preprocessing as preprocessing
 
+def transf_from_probs(x, y, likelihood_params):
+    """"""
+    y_extd = [] 
+    x_index = []
+    for yi in range(len(y)):
+        if y[yi] == 0 or y[yi] == -1:
+            y_extd.append(-1)
+            x_index.append(yi)
+        else:
+            y_extd.append(1)
+            x_index.append(yi)
+            if "extend" in likelihood_params:
+                y_extd.append(-1)
+                x_index.append(yi)
+    w = []
+    for yi in range(len(y)):
+        if y[yi] == 0 or y[yi] == -1:
+            w.append(1)
+        else:   
+            w.append(y[yi])
+            if "extend" in likelihood_params:
+                w.append(1 - y[yi])
+    #print x_index, y, y_extd, w
+    #print x.iloc[:, x.shape[1] - 1]
+    #print x.iloc[x_index,len(x_index) - 1]
+    return x.iloc[x_index,], ps.Series(y_extd), ps.Series(w)
+
 def normalize(array):
     #TODO check normalization procedure
     """normalize a feature matrix
@@ -62,8 +89,13 @@ def bacc(pos_acc, neg_acc):
     """compute balanced accuracy"""
     return float(pos_acc + neg_acc)/2
 
-def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec, perc_feats, no_classifier = 10):
+def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None):
     """train model on given training features and target and return the predicted labels for the left out samples"""
+    if not likelihood_params is None and "continuous_target" in likelihood_params:
+        #transform x and y
+        x_train, y_train, w = transf_from_probs(x_train, y_train, likelihood_params)
+    else:
+        w = ps.Series(np.ones(shape = len(y_train)) )
     #set y negative labels to -1
     y_train_t = y_train.copy() 
     y_train_t[y_train_t == 0] = -1
@@ -83,9 +115,12 @@ def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_r
         if is_phypat_and_rec:
             #reduce xp feature space to the selected features
             xp_train_sub = xp_train.loc[:, sample]
-            predictor.fit(ps.concat([x_train_sub, xp_train_sub], axis = 0), ps.concat([y_train_t, yp_train_t], axis = 0))
+            sample_weight = ps.concat([w, ps.Series(np.ones(len(yp_train_t)))])
+            X = ps.concat([x_train_sub, xp_train_sub], axis = 0)
+            y = ps.concat([y_train_t, yp_train_t], axis = 0)
+            predictor.fit(X = X, y = y, sample_weight = sample_weight )
         else: 
-            predictor.fit(x_train_sub, y_train_t)
+            predictor.fit(x_train_sub, y_train_t, sample_weight = w)
         
         all_preds.iloc[:, i]  = predictor.predict(x_test.loc[:, sample])
     #do majority vote to aggregate predictions
@@ -118,14 +153,23 @@ def join_edges(x_r, train2all, likelihood_params, parsimony_params):
     for e in train2all:
         #aggregate rows by summing up
         if not likelihood_params is None:
-            cs = x_r.loc[train2all[e], :].sum(axis=0)
-            df = ps.concat([df, cs], axis = 1)
-            #print "df shape", df.shape
+            if not 'gt_probs' in likelihood_params:
+                cs = x_r.loc[train2all[e], :].sum(axis=0)
+                df = ps.concat([df, cs], axis = 1)
+            else:
+                #sum up the probabilities
+                cs = np.zeros(shape = x_r.shape[1])
+                for i in range(x_r.loc[train2all[e], :].shape[0]):
+                    #print "before aggregation", cs 
+                    #print "being aggregated", x_r.loc[train2all[e], :].iloc[i, :]
+                    cs = cs + (1 - cs) * x_r.loc[train2all[e], :].iloc[i, :]
+                    #print "after aggregation", cs
+                df = ps.concat([df, ps.Series(cs)], axis = 1)
         else: 
             raise Exception("parsimony case not yet implemented")    
     #make sure there are no entries in the summed up likelihood matrix other than 0 and 1
-    if not likelihood_params is None:
-        df[x_r==2] = 1
+    if not likelihood_params is None and 'gt_probs' in likelihood_params:
+        df[x_r > 0] = 1
     #get df back into samples x features shape 
     df.columns = train2all.keys()
     return df.T
@@ -234,7 +278,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
             all_preds.index = yp_train.index
             #do inner cross validation
             preds = []
-            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats)
+            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params)
                     for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
                         in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(c_params)))):
                 preds.append(list(pred))
@@ -264,15 +308,22 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
     #TODO think about assigning the folds randomly to shuffle the input data
     for j in range(len(c_params)):
         preds = []
-        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, no_classifier = 10)
+        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = likelihood_params)
                 for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
             preds += list(pred)
         all_preds[:,j] = preds
     return all_preds
 
 
-def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out, pt_out, is_phypat_and_rec, perc_feats, no_classifier = 10):
+def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out, pt_out, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None):
     """determine the features occuring in the majority of the k best models"""
+    #retrieve weights from likelihood_params
+    if not likelihood_params is None and "continuous_target" in likelihood_params:
+        #transform x and y
+        print y
+        x, y, w = transf_from_probs(x,y, likelihood_params)
+    else:
+        w = ps.Series(np.ones(shape = len(y)) )
     #determine the k best classifiers
     all_preds.index = y_p.index
     x.columns = x_p.columns
@@ -280,6 +331,7 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
     y_p_t[y_p_t == 0] = -1
     y_t = y.copy()
     y_t[y_t == 0] = -1
+    print y_t
     baccs = [bacc(recall_pos(y_p_t, all_preds.iloc[:,j]), recall_neg(y_p_t, all_preds.iloc[:,j])) for j in range(len(c_params))]
     recps = [recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(c_params))]
     recns = [recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(c_params))]
@@ -297,9 +349,9 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
             x_sub = x.loc[:, sample]
             if is_phypat_and_rec:
                 x_p_sub = x_p.loc[:, sample]
-                predictor.fit(ps.concat([x_sub, x_p_sub], axis = 0), ps.concat([y_t, y_p_t], axis = 0))
+                predictor.fit(ps.concat([x_sub, x_p_sub], axis = 0), ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([w, ps.Series(np.ones(shape = len(y_p)))]))
             else:
-                predictor.fit(x_sub, y_t)
+                predictor.fit(x_sub, y_t, sample_weight = w)
                 #save the model
             predictors.append(predictor)
             models[[np.array(sample) - 1], i * no_classifier + l] = predictor.coef_

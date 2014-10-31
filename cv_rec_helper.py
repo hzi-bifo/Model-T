@@ -1,6 +1,7 @@
 import os
 import build_edge_matrix_likelihood as beml
 import build_edge_matrix as bem
+import join_likelihood_recon as jlr
 import pandas as ps
 import discretize_likelihood_recon as dlr
 import shutil
@@ -63,34 +64,50 @@ def reconstruct_pt_likelihood(yp_train, model_out, likelihood_params):
         #create gain output dir
         outdir_g = "%s/gain/"%tmp_dir
         os.mkdir(outdir_g)
-        b.get_all_edge_m(0,0,0,0, outdir_g)
-        outdir_dlr = "%s/discretized_gain"%tmp_dir
-        os.mkdir(outdir_dlr)
-        #gain events only case
-        if likelihood_params["mode"] == "gain":
-            if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")):
-                raise ValueError("Phenotype has no events associated with it")    
-            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
+        if "continuous_target" in likelihood_params:
+            m = b.get_all_edge_m(0,0,0,0, outdir_g, is_internal = True)
+            print "gain", m
+        else: 
+            b.get_all_edge_m(0,0,0,0, outdir_g)
+            outdir_dlr = "%s/discretized_gain"%tmp_dir
+            os.mkdir(outdir_dlr)
+            #gain events only case
+            if likelihood_params["mode"] == "gain":
+                if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")):
+                    raise ValueError("Phenotype has no events associated with it")    
+                m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "loss":
         b = beml.build_edge_matrix_likelihood(tree_l_f, "newick", "%s/pt_train.names.tsv"%tmp_dir, "%s/pt_train.tsv"%tmp_dir, "%s/RESULTS/%s"%(tmp_dir,event_f), use_likelihood = True, use_gain_events = False)
         #create gain output dir
         outdir_l = "%s/loss/"%tmp_dir
         os.mkdir(outdir_l)
-        b.get_all_edge_m(0,0,0,0, outdir_l)
-        outdir_dlr = "%s/discretized_loss"%tmp_dir
-        os.mkdir(outdir_dlr)
-        #loss events only case
-        if likelihood_params["mode"] == "loss":
-            if not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
-                raise ValueError("Phenotype has no events associated with it")    
-            m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
+        if "continuous_target" in likelihood_params:
+            m = b.get_all_edge_m(0,0,0,0, outdir_l, is_internal = True)
+        else:
+            b.get_all_edge_m(0,0,0,0, outdir_l)
+            outdir_dlr = "%s/discretized_loss"%tmp_dir
+            os.mkdir(outdir_dlr)
+            #loss events only case
+            if likelihood_params["mode"] == "loss":
+                if not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+                    raise ValueError("Phenotype has no events associated with it")    
+                m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
     if likelihood_params["mode"] == "gain_loss": 
-        #gain and loss events combined
         if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) or not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
             raise ValueError("Phenotype has no events associated with it")  
-        outdir_dlr = "%s/discretized_gain_loss"%tmp_dir
-        os.mkdir(outdir_dlr)
-        m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l, is_internal = True) 
+        #gain and loss events combined
+        if "continuous_target" in likelihood_params:
+            #join gain and loss event matrices
+            m = jlr.threshold_matrix(outdir_g, "",  outdir_l, is_internal = True)
+            
+        else:
+            if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) or not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+                raise ValueError("Phenotype has no events associated with it")  
+            outdir_dlr = "%s/discretized_gain_loss"%tmp_dir
+            os.mkdir(outdir_dlr)
+            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l, is_internal = True) 
+    #drop first column that is due to genotype reconstruction and either empty or duplicate of phenotype column
+    m = ps.DataFrame(m.iloc[:, 1] )
     return m
 
 

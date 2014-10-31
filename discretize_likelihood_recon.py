@@ -59,7 +59,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 m1.loc[m1.iloc[:, m1.shape[1] - 1] >= t, m1.shape[1]] = 1
                 m2.loc[m2.iloc[:, m2.shape[1] - 1] >= t, m2.shape[1]] = 1
                 m = m1 + (1 - m1) * m2 
-                print m.iloc[:, m.shape[1] - 1]
+                #print m.iloc[:, m.shape[1] - 1]
             else:
                 m1[m1>=t] = 1
                 m1[m1<t] = 0
