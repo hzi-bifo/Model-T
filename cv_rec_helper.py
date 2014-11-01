@@ -66,7 +66,7 @@ def reconstruct_pt_likelihood(yp_train, model_out, likelihood_params):
         os.mkdir(outdir_g)
         if "continuous_target" in likelihood_params:
             m = b.get_all_edge_m(0,0,0,0, outdir_g, is_internal = True)
-            print "gain", m
+            #print "gain", m
         else: 
             b.get_all_edge_m(0,0,0,0, outdir_g)
             outdir_dlr = "%s/discretized_gain"%tmp_dir

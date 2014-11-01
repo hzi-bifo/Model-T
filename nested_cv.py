@@ -278,7 +278,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
             all_preds.index = yp_train.index
             #do inner cross validation
             preds = []
-            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params)
+            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params = likelihood_params)
                     for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
                         in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(c_params)))):
                 preds.append(list(pred))
@@ -295,11 +295,11 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
             c_opt = c_params[np.argmax(np.array(baccs))]
             print c_opt
             #use that C param to train a classifier to predict the left out samples in the outer cv
-            p = cv(x_train, y_train, xp_train, yp_train, xp_test, params , c_opt, is_phypat_and_rec, perc_feats, no_classifier = 10)
+            p = cv(x_train, y_train, xp_train, yp_train, xp_test, params , c_opt, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = likelihood_params)
             ocv_preds += list(p)
         return ocv_preds
 
-    folds = setup_folds(x, y, cv_outer, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params,is_phypat_and_rec)
+    folds = setup_folds(x, y, cv_outer, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec)
     #for i in folds:
     #    for j in i:
             #print j.shape
@@ -308,7 +308,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
     #TODO think about assigning the folds randomly to shuffle the input data
     for j in range(len(c_params)):
         preds = []
-        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = likelihood_params)
+        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params = likelihood_params)
                 for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
             preds += list(pred)
         all_preds[:,j] = preds

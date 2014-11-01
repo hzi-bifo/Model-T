@@ -5,18 +5,23 @@ import pandas
 import sys
 import numpy as np
 
-def single_matrix(m, f, outdir):
+def single_matrix(m, f, outdir, t = None):
     """discretize a single matrix""" 
     print "processing file %s"%(f)
+    if not t is None:
+        y = m.iloc[:, m.shape[1] - 1].copy()
+        m[m >= t] = 1
+        m[m < t] = 0
+        m.iloc[:, m.shape[1] - 1] = y
     m.to_csv(os.path.join(outdir, f), sep="\t", header=None, index=True)
     return m
 
-def threshold_matrix(dir1, outdir, loss_dir2=None, is_internal = False):
+def threshold_matrix(dir1, outdir, loss_dir2=None, is_internal = False, t = None):
     """discretize one or combine two matrices into one discretized matrix"""
     if loss_dir2 is None:
         for f1 in os.listdir(dir1):
             m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0, header=None) 
-            m =  single_matrix(m1, f1, outdir)
+            m =  single_matrix(m1, f1, outdir, t)
             if is_internal:
                 return m
 
@@ -28,7 +33,7 @@ def threshold_matrix(dir1, outdir, loss_dir2=None, is_internal = False):
             else: 
                 #no gain event file found, go into single matrix case
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
-                m =  single_matrix(m2, m_f, outdir)
+                m =  single_matrix(m2, m_f, outdir, t)
                 if is_internal:
                     return m
                 continue 
@@ -36,13 +41,20 @@ def threshold_matrix(dir1, outdir, loss_dir2=None, is_internal = False):
                 m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0, header=None) 
             else: 
                 #no loss event file found, go into single matrix case
-                m = single_matrix(m1, m_f, outdir)
+                m = single_matrix(m1, m_f, outdir, t)
                 if is_internal:
                     return m
                 continue
             print "processing file %s/%s"%(loss_dir2, m_f)
-            #combine gain and loss events
-            m = m1 + (1 - m1) * m2 
+            if t is None:
+                #combine gain and loss events
+                m = m1 + (1 - m1) * m2 
+            else:
+                m = m1 + (1 - m1) * m2 
+                y = m.iloc[:, m.shape[1] - 1].copy()
+                m[m >= t] = 1  
+                m[m < t] = 0  
+                m.iloc[:, m.shape[1] - 1] = y
             if is_internal:
                 return m
             else:
@@ -58,10 +70,11 @@ if __name__=="__main__":
 -d <input dir> with edge matrices corresponding to the likelihood of gain or loss events
 -f <second directory> with gain or loss likelihood matrices that shall be combined with those given in the input dir specified by the -d option
 -o <out dir> for the joined gain loss matrices 
+-t <optional threshold for the genotypes> if set the features will be discretized according to the give threshold but only the features not the target / phenotype
         """ % (sys.argv[0])
         sys.exit(1)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "d:o:f:")
+        optlist, args = getopt.getopt(sys.argv[1:], "d:o:f:t:")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
@@ -70,7 +83,6 @@ if __name__=="__main__":
     t = None
     out = None
     dir2 = None
-    discretize_pt_only = False 
     for o, a in optlist:
         if o == "-d":
             dir1 = a
@@ -83,4 +95,6 @@ if __name__=="__main__":
                 os.mkdir(out)
         if o == "-f":
             dir2 = a
-    threshold_matrix(dir1,  out, dir2)
+        if o == "-t":
+            t = float(a)
+    threshold_matrix(dir1,  out, dir2, t = t)
