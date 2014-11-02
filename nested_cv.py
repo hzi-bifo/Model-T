@@ -117,12 +117,17 @@ def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_r
             xp_train_sub = xp_train.loc[:, sample]
             sample_weight = ps.concat([w, ps.Series(np.ones(len(yp_train_t)))])
             X = ps.concat([x_train_sub, xp_train_sub], axis = 0)
+            #add inverse features
+            X = ps.concat([X,1-X], axis = 1) 
             y = ps.concat([y_train_t, yp_train_t], axis = 0)
             predictor.fit(X = X, y = y, sample_weight = sample_weight )
         else: 
+            #add inverse features
+            x_train_sub = ps.concat([x_train_sub, 1-x_train_sub], axis = 1) 
             predictor.fit(x_train_sub, y_train_t, sample_weight = w)
-        
-        all_preds.iloc[:, i]  = predictor.predict(x_test.loc[:, sample])
+        x_test_sample = x_test.loc[:, sample] 
+        x_test_sample = ps.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
+        all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
     #do majority vote to aggregate predictions
     aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
     return aggr_preds 
@@ -349,10 +354,19 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
             x_sub = x.loc[:, sample]
             if is_phypat_and_rec:
                 x_p_sub = x_p.loc[:, sample]
-                predictor.fit(ps.concat([x_sub, x_p_sub], axis = 0), ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([w, ps.Series(np.ones(shape = len(y_p)))]))
+                X = ps.concat([x_sub, x_p_sub], axis = 0)
+                #add inverse features
+                X = ps.concat([X, 1 - X], axis = 1)
+                predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([w, ps.Series(np.ones(shape = len(y_p)))]))
             else:
+                #add inverse features
+                x_sub =  ps.concat([x_sub, x_sub], axis = 1)
                 predictor.fit(x_sub, y_t, sample_weight = w)
                 #save the model
+            #collapse extended feature space
+            print predictor.coef_[0], len(predictor.coef_[0])
+            predictor.coef_ = predictor.coef_[0][0:(len(predictor.coef_[0]))/2] + predictor.coef_[0][(len(predictor.coef_[0]))/2 : len(predictor.coef_[0])]
+            print predictor.coef_, len(predictor.coef_)
             predictors.append(predictor)
             models[[np.array(sample) - 1], i * no_classifier + l] = predictor.coef_
     feats = []
