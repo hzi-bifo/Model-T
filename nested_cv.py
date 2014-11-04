@@ -60,7 +60,7 @@ def normalize(array):
     #cs[cs==0] = 1000
     #array_rs_cs = array_rs/cs
     #print np.max(array_rs_cs,0)
-    scaler = preprocessing.StandardScaler(with_mean = False, with_std = True).fit(array)
+    scaler = preprocessing.StandardScaler(with_mean = True, with_std = True).fit(array)
     transformed = ps.DataFrame(data = scaler.transform(array), index = array.index, columns = array.columns)
     return transformed, scaler
     #return  scaler, cs
@@ -89,8 +89,9 @@ def bacc(pos_acc, neg_acc):
     """compute balanced accuracy"""
     return float(pos_acc + neg_acc)/2
 
-def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None, inverse_feats = False):
+def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None, inverse_feats = False, do_normalization = True):
     """train model on given training features and target and return the predicted labels for the left out samples"""
+
     if not likelihood_params is None and "continuous_target" in likelihood_params:
         #transform x and y
         x_train, y_train, w = transf_from_probs(x_train, y_train, likelihood_params)
@@ -111,7 +112,8 @@ def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_r
         #select a subset of features for classification
         sample = sorted(random.sample(x_train.columns, int(math.floor(x_train.shape[1] * perc_feats))))
         #reduce feature space to the selected features
-        x_train_sub = x_train.loc[:, sample]
+        x_train_sub = x_train.loc[:, sample].copy()
+
         if is_phypat_and_rec:
             #reduce xp feature space to the selected features
             xp_train_sub = xp_train.loc[:, sample]
@@ -120,17 +122,23 @@ def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_r
             if inverse_feats:
                 #add inverse features
                 X = ps.concat([X,1-X], axis = 1) 
+            if do_normalization:
+                X, scaler = normalize(X)
             y = ps.concat([y_train_t, yp_train_t], axis = 0)
-            predictor.fit(X = X, y = y, sample_weight = sample_weight )
+            predictor.fit(X = X, y = y, sample_weight = sample_weight)
         else: 
             if inverse_feats:
                 #add inverse features
                 x_train_sub = ps.concat([x_train_sub, 1-x_train_sub], axis = 1) 
+            if do_normalization:
+                x_train_sub, scaler = normalize(x_train_sub)
             predictor.fit(x_train_sub, y_train_t, sample_weight = w)
-        x_test_sample = x_test.loc[:, sample] 
+        x_test_sample = x_test.loc[:, sample].copy()
         if inverse_feats:
             #add inverse features to test sample
             x_test_sample = ps.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
+        if do_normalization:
+            x_test_sample = ps.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
         all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
     #do majority vote to aggregate predictions
     aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
@@ -271,7 +279,7 @@ def setup_folds_phypat(x, y, cv):
 
 
 
-def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec, perc_feats, inverse_feats):
+def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec, perc_feats, inverse_feats, do_normalization):
     """do a cross validation with cv_outer folds
     if only cv_outer is given do a cross validation for each value of the paramter C given
     if cv_inner is given, do a nested cross validation optimizing the paramter C in the inner loop"""
@@ -287,7 +295,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
             all_preds.index = yp_train.index
             #do inner cross validation
             preds = []
-            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats)
+            for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats, do_normalization = do_normalization)
                     for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
                         in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(c_params)))):
                 preds.append(list(pred))
@@ -304,7 +312,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
             c_opt = c_params[np.argmax(np.array(baccs))]
             print c_opt
             #use that C param to train a classifier to predict the left out samples in the outer cv
-            p = cv(x_train, y_train, xp_train, yp_train, xp_test, params , c_opt, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = likelihood_params, inverse_feats = inverse_feats)
+            p = cv(x_train, y_train, xp_train, yp_train, xp_test, params , c_opt, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = likelihood_params, inverse_feats = inverse_feats, do_normalization = do_normalization)
             ocv_preds += list(p)
         return ocv_preds
 
@@ -317,14 +325,14 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
     #TODO think about assigning the folds randomly to shuffle the input data
     for j in range(len(c_params)):
         preds = []
-        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats)
+        for pred in Parallel(n_jobs=n_jobs)(delayed(cv)(x_train, y_train, xp_train, yp_train, xp_test, params, c_params[j], is_phypat_and_rec, perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats, do_normalization = do_normalization)
                 for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
             preds += list(pred)
         all_preds[:,j] = preds
     return all_preds
 
 
-def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out, pt_out, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None, inverse_feats = False):
+def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out, pt_out, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None, inverse_feats = False, do_normalization = True):
     """determine the features occuring in the majority of the k best models"""
     #retrieve weights from likelihood_params
     if not likelihood_params is None and "continuous_target" in likelihood_params:
@@ -362,11 +370,15 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
                 if inverse_feats:
                     #add inverse features
                     X = ps.concat([X, 1 - X], axis = 1)
+                if do_normalization:
+                    X, _ = normalize(X)
                 predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([w, ps.Series(np.ones(shape = len(y_p)))]))
             else:
                 if inverse_feats:
                     #add inverse features
                     x_sub =  ps.concat([x_sub, x_sub], axis = 1)
+                if do_normalization:
+                    x_sub, _ = normalize(x_sub)
                 predictor.fit(x_sub, y_t, sample_weight = w)
                 #save the model
             if inverse_feats:
