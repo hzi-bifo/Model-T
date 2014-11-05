@@ -11,6 +11,9 @@ from joblib import Parallel, delayed, load, dump
 from operator import itemgetter
 import math
 import random
+#initialize with seed
+#TODO put this into a class and use random state from gideon script
+random.seed(1)
 import cv_rec_helper as crh 
 import sys
 import itertools
@@ -285,6 +288,7 @@ def outer_cv(x, y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x
     if cv_inner is given, do a nested cross validation optimizing the paramter C in the inner loop"""
     #do n fold cross validation
     #number of elements in each invidual fold
+    #print y_p.index, y.index
     if not cv_inner is None:
         ofolds = setup_folds(x, y, cv_outer, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec)
         ocv_preds = []
@@ -337,7 +341,6 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
     #retrieve weights from likelihood_params
     if not likelihood_params is None and "continuous_target" in likelihood_params:
         #transform x and y
-        print y
         x, y, w = transf_from_probs(x,y, likelihood_params)
     else:
         w = ps.Series(np.ones(shape = len(y)) )
@@ -348,7 +351,6 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
     y_p_t[y_p_t == 0] = -1
     y_t = y.copy()
     y_t[y_t == 0] = -1
-    print y_t
     baccs = [bacc(recall_pos(y_p_t, all_preds.iloc[:,j]), recall_neg(y_p_t, all_preds.iloc[:,j])) for j in range(len(c_params))]
     recps = [recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(c_params))]
     recns = [recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(c_params))]
@@ -361,7 +363,7 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
     for i in range(k):
         predictor = svm.LinearSVC(C=baccs_s[i][3])
         predictor.set_params(**params)
-        sample = random.sample(x.columns, int(math.floor(x.shape[1] * perc_feats)))
+        sample = sorted(random.sample(x.columns, int(math.floor(x.shape[1] * perc_feats))))
         for l in range(no_classifier):
             x_sub = x.loc[:, sample]
             if is_phypat_and_rec:

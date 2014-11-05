@@ -5,6 +5,8 @@ import sys
 import shutil
 import getopt
 import pandas as ps
+import random
+random.seed(0)
 
 #c_params = [0.05, 0.05]
 #c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1, 3, 7, 10]
@@ -62,6 +64,11 @@ def cv_and_fs(model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, 
         pt_out = pt
         x_p = p[p.iloc[:,pt].notnull()].iloc[:, gt_start:gt_end+1]
         y_p = p[p.iloc[:,pt].notnull()].iloc[:, pt]
+        #shuffle phyletic pattern samples to avoid biases in the cross validation
+        rows = x_p.index.values.copy()
+        random.shuffle(rows)
+        x_p = x_p.loc[rows, ]
+        y_p = y_p.loc[rows, ]
         if not rec_dir is None:
             if not os.path.exists("%s/pt%s.dat"%(rec_dir,pt)):
                 print "skipping pt", pt, "no reconstruction matrix found, possibly due to no reconstruction events for this phenotype"
@@ -186,7 +193,6 @@ def cv_and_fs(model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, 
             f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
             f.flush()
         all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization))
-        #make sure y_p has the right labels
         ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec, perc_feats = perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats, do_normalization = do_normalization)
     f.close()
 if __name__=="__main__":
