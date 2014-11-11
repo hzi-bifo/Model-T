@@ -92,6 +92,16 @@ def bacc(pos_acc, neg_acc):
     """compute balanced accuracy"""
     return float(pos_acc + neg_acc)/2
 
+def balance_weights(weights, y):
+    """balance weights between pos/neg class in phyletic pattern and in the reconstruction based samples """
+    weights.index = y.index
+    #print weights
+    weights[y == -1]  = weights[y == -1] / weights[y == -1].sum() * 40 
+    weights[y == 1]  = weights[y == 1] / weights[y == 1].sum() * 40
+    #print y
+    #print weights
+    return weights
+
 def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_rec, perc_feats, no_classifier = 10, likelihood_params = None, inverse_feats = False, do_normalization = True):
     """train model on given training features and target and return the predicted labels for the left out samples"""
 
@@ -119,8 +129,22 @@ def cv(x_train, y_train, xp_train, yp_train, x_test, params , C, is_phypat_and_r
 
         if is_phypat_and_rec:
             #reduce xp feature space to the selected features
+            #EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
+            #index_vector = (y_train_t != -1) | (w != 1)
+            #print y_train_t
+            #print w
+            #print index_vector
+            #print x_train_sub.shape
+            #index_vector.index = x_train_sub.index
+            #x_train_sub = x_train_sub[index_vector]
+            #index_vector.index = y_train_t.index
+            #y_train_t = y_train_t[index_vector]
+            #w = w[index_vector]
+            #END EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
             xp_train_sub = xp_train.loc[:, sample]
-            sample_weight = ps.concat([w, ps.Series(np.ones(len(yp_train_t)))])
+            sample_weight = ps.concat([w, ps.Series(np.ones(shape = len(yp_train_t)))])
+            #sample_weight = ps.concat([balance_weights(w, y_train_t), balance_weights(ps.Series(np.ones(len(yp_train_t))), yp_train_t)])
+            #print sample_weight.sum(), "sample weights total"
             X = ps.concat([x_train_sub, xp_train_sub], axis = 0)
             if inverse_feats:
                 #add inverse features
@@ -360,6 +384,18 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
     if perc_feats == 1.0:
         no_classifier = 1
     models = np.zeros(shape=(x.shape[1], k * no_classifier))
+    #EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
+    #index_vector = (y_t != -1) | (w != 1)
+    #print y_t
+    #print w
+    #print index_vector
+    #print x.shape
+    #index_vector.index = x.index
+    #x = x[index_vector]
+    #index_vector.index = y_t.index
+    #y_t = y_t[index_vector]
+    #w = w[index_vector]
+    #END EXPERIMENTAL
     for i in range(k):
         predictor = svm.LinearSVC(C=baccs_s[i][3])
         predictor.set_params(**params)
@@ -374,7 +410,7 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
                     X = ps.concat([X, 1 - X], axis = 1)
                 if do_normalization:
                     X, _ = normalize(X)
-                predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([w, ps.Series(np.ones(shape = len(y_p)))]))
+                predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([balance_weights(w, y_t), balance_weights(ps.Series(np.ones(shape = len(y_p))), y_p_t)]))
             else:
                 if inverse_feats:
                     #add inverse features
