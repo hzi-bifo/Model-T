@@ -32,7 +32,7 @@ def write_miscl(miscl_plus,  model_out, pt_out):
 
 
 
-def cv_and_fs(model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_feats = 1.0, inverse_feats = False, do_normalization = False):
+def cv_and_fs(model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_samples = 1.0, perc_feats = 1.0, inverse_feats = False, do_normalization = False):
     #create output directory if not already existing, append input parameter specific suffices
     #model_out = "%s/%s_%s"%(model_out, "bin" if bin else "counts", "recbased" if os.path.isdir(data_f) else "phypat")
     #if not os.path.exists(model_out):
@@ -163,7 +163,7 @@ def cv_and_fs(model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, 
             is_rec_based = True
         if not cv_inner is None:
             try:
-                all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec, perc_feats, inverse_feats, do_normalization)))
+                all_preds = ps.Series(np.array(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner, n_jobs, is_rec_based, x_p, y_p, model_out, likelihood_params, parsimony_params, is_phypat_and_rec, perc_samples, perc_feats,  inverse_feats, do_normalization)))
             except ValueError as e:
                 import traceback
                 print traceback.print_exc(e)
@@ -192,8 +192,8 @@ def cv_and_fs(model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, 
             write_miscl(miscl_plus, model_out, pt_out)
             f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
             f.flush()
-        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization))
-        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec, perc_feats = perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats, do_normalization = do_normalization)
+        all_preds = ps.DataFrame(ncv.outer_cv(x,y, params, c_params, cv_outer, cv_inner = None, n_jobs = n_jobs, is_rec_based = is_rec_based, x_p = x_p, y_p = y_p, model_out = model_out, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization))
+        ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, 5, model_out, pt_out, is_phypat_and_rec, perc_samples = perc_samples, perc_feats = perc_feats, likelihood_params = likelihood_params, inverse_feats = inverse_feats, do_normalization = do_normalization)
     f.close()
 if __name__=="__main__":
     #only testing
@@ -221,7 +221,7 @@ if __name__=="__main__":
         """ % (sys.argv[0])
         sys.exit(2)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "y:d:l:a:bv:i:cj:g:p:o:r:e")
+        optlist, args = getopt.getopt(sys.argv[1:], "y:d:l:a:bv:i:cj:g:p:o:s:r:e")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
@@ -238,6 +238,7 @@ if __name__=="__main__":
     g1 = g2 = None
     pt1 = pt2 = None
     n_jobs = 1 
+    perc_samples = 1.0
     perc_feats = 1.0
     inverse_feats = False 
 
@@ -273,8 +274,10 @@ if __name__=="__main__":
                 sys.exit(1)
             else:
                 os.mkdir(out)
+        if o == "-s":
+            perc_samples = float(a)
         if o == "-r":
             perc_feats = float(a)
         if o == "-e":
             inverse_feats = True
-    cv_and_fs(phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization)
+    cv_and_fs(phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization)
