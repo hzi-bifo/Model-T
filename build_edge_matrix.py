@@ -1,6 +1,8 @@
 import sys
 import named_narray as na
 import os.path
+import numpy as np
+import pandas as ps
 try:
         import dendropy as dp
 except ImportError:
@@ -225,22 +227,32 @@ class build_edge_matrix:
             else: edge2char2val[isn][pt]=int(ev[3])
         return edge2char2val
 
-    def get_edge_m(self,edge2char2val, edges, gt_start, gt_end,pt, out_f):
+    def get_edge_m(self,edge2char2val, edges, gt_start, gt_end,pt, out_f, is_internal = False):
         """generate for each edge a vector  of all characters"""
-        out_fo = open(out_f, 'w')
+        #out_fo = open(out_f, 'w')
+        print gt_start, gt_end, "gt_start", "gt_end"
+        out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start + 1)))
+        out_m.index = ["_".join(e) for e in edges]
+        out_m.columns = range(gt_start, gt_end) + [pt]
         for e in edges:
-            s="%s\t"%str("_".join(e))
+            #s="%s\t"%str("_".join(e))
             for gt in range(gt_start, gt_end):
                 if gt in edge2char2val[tuple(e)]:
-                    s+="%s\t"%edge2char2val[tuple(e)][gt]
-                else:
-                    s+="0\t"
+                    out_m.loc["_".join(e), gt] = edge2char2val[tuple(e)][gt]
+                    #s+="%s\t"%edge2char2val[tuple(e)][gt]
+                #else:
+                #    s+="0\t"
             if pt in edge2char2val[tuple(e)]:
-                s+="%s\n"%edge2char2val[tuple(e)][pt]
-            else: s+="0\n"
-            out_fo.write(s)
+                out_m.loc["_".join(e), pt] = edge2char2val[tuple(e)][pt]
+                #s+="%s\n"%edge2char2val[tuple(e)][pt]
+            #else: s+="0\n"
+            #out_fo.write(s)
+        out_m.to_csv(out_f, sep = "\t", header = False)
+        if is_internal: 
+            return out_m 
 
-    def get_all_edge_m(self,gt_start,gt_end, pt_start, pt_end, out_dir):
+
+    def get_all_edge_m(self,gt_start,gt_end, pt_start, pt_end, out_dir, is_internal = False):
         """for all phenotypes generate a edge based matrix"""
         for pt in range(pt_start, pt_end+1):
             #check if phenotype has any events associated with it
@@ -252,7 +264,9 @@ class build_edge_matrix:
             pt_dict = self.get_pt_dict(edges)
             #plus one because we want to include column gt_end
             edge2char2val =self.map_events(pt_dict, gt_start, gt_end + 1, self.char2ev,pt, edges)
-            self.get_edge_m(edge2char2val, edges, gt_start, gt_end + 1, pt, "%s/pt%s.dat"%(out_dir,pt))
+            m = self.get_edge_m(edge2char2val, edges, gt_start, gt_end + 1, pt, "%s/pt%s.dat"%(out_dir,pt), is_internal = is_internal)
+            if is_internal:
+                return m
 
 if __name__ == '__main__':
     import getopt
