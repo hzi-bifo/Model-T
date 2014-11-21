@@ -11,16 +11,17 @@ random.seed(0)
 #c_params = [0.05, 0.05]
 #c_params = [0.03, 0.07, 0.1, 0.3, 0.7, 1, 3, 7, 10]
 #c_params = [0.02, 0.03, 0.05, 0.07, 0.1, 0.3, 0.5, 0.7, 1]
-c_params = [0.001, 0.005, 0.007,  0.01, 0.015, 0.02, 0.03, 0.05, 0.07, 0.1, 0.3, 0.5, 0.7, 1]
+c_params = [0.001, 0.002, 0.005, 0.007,  0.01,  0.02,  0.05, 0.07, 0.1, 0.2 0.5, 0.7, 1]
 MIN_POS = 10
 MIN_NEG = 10
 MIN_SAMPLES = 20
+SP2TXID = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gideon_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_stol_20130904.sp_uq.taxid.txt"
 params = {'loss':'l2', 'tol':0.000001, 'penalty':'l1', 'dual':False, 'fit_intercept':True, 'intercept_scaling':1, 'class_weight':'auto', 'random_state':1}
 #c_params = [1,5,10,50,100]
 
 def write_miscl(miscl_plus,  model_out, pt_out):
-    gideon_f = open("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gideon_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_stol_20130904.sp_uq.taxid.txt", "r")
-    ls = gideon_f.readlines()
+    gideon_f = open(, "r")
+    ls = gideon_f.readlines(SP2TXID)
     id2sp = {}
     f = open("%s/%s_miscl.txt"%(model_out,pt_out), 'w')
     for i in range(len(ls)):

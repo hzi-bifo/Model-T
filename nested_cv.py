@@ -18,7 +18,7 @@ import cv_rec_helper as crh
 import sys
 import itertools
 import sklearn.preprocessing as preprocessing
-
+ID2PFAM2DESC = "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc_NA.txt"
 def transf_from_probs(x, y, likelihood_params):
     """"""
     y_extd = [] 
@@ -70,7 +70,8 @@ def normalize(array):
 
 
 def get_pfam_names_and_descs(feats):
-    pfam_f = open("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfam_pts_names_nl_desc.txt", "r")
+    #pfam_f = open("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfam_pts_names_nl_desc.txt", "r")
+    pfam_f = open(ID2PFAM2DESC, "r")
     id2pf = {}
     ls = pfam_f.readlines()
     for i in range(len(ls)):
@@ -449,6 +450,8 @@ def majority_feat_sel(x, y, x_p, y_p, all_preds, params, c_params, k, model_out,
             else:
                 rel_weights = predictor.coef_
             predictors.append(predictor)
+            print rel_weights
+            print rel_weights.shape
             models[[np.array(sample_feats) - 1], i * no_classifier + l] = rel_weights 
     feats = []
     #determine the majority features 
