@@ -6,7 +6,7 @@ import sys
 
 class node_anc_rec:
 
-    def __init__(self, tree_f, majority_feat_f, gain_m_f, loss_m_f, pfam_pts_f, pfam_ids_f, pt_id):
+    def __init__(self, tree_f, majority_feat_f, gain_m_f, loss_m_f, pfam_pts_f, pfam_ids_f, pt_id, feat_list):
         #read in gain and loss event matrices 
         self.gain_m = ps.read_csv(gain_m_f, sep = "\t", index_col = 0, header = None)
         self.loss_m = ps.read_csv(loss_m_f, sep = "\t", index_col = 0, header = None)
@@ -20,7 +20,11 @@ class node_anc_rec:
         #self.loss_m.rename(columns = {8478:8477}, inplace = True)
         #self.gain_m.rename(columns = {8478:8477}, inplace = True)
         #read in majority features
-        self.feats = ps.read_csv(majority_feat_f, index_col = 0, sep = "\t", header = None)
+        if not majority_feat_f is None:
+            self.feats = ps.read_csv(majority_feat_f, index_col = 1, sep = "\t", header = True)
+        else:
+            self.feats = ps.DataFrame(feat_list)
+            self.feats.index = self.feats.iloc[:, 0]
         pf2id = ps.read_csv(pfam_ids_f, sep = "\t", header = None, index_col = 1)
         self.feat_ids = pf2id.loc[self.feats.index.values, 0] 
         self.feat_ids = self.feat_ids
@@ -50,14 +54,8 @@ class node_anc_rec:
     def reconstruct(self):
         #traverse tree to determine the internal node states based on the edge events
         self.get_internal_states(self.pt_tree, 8477)
-        self.get_internal_states(self.pt_tree, self.feat_ids.loc["PF14470"])
-        self.get_internal_states(self.pt_tree, self.feat_ids.loc["PF04066"])
-        self.get_internal_states(self.pt_tree, self.feat_ids.loc["PF09922"])
-        #self.get_internal_states(self.pt_tree, self.feat_ids.loc["PF07238" ])
-        #self.get_internal_states(self.pt_tree, self.feat_ids.loc["PF13677"])
-        #self.get_internal_states(self.pt_tree, self.feat_ids.loc["PF07102"])
-        #for i in self.feat_ids:
-        #    self.get_internal_states(self.pt_tree, i)
+        for i in self.feat_ids:
+            self.get_internal_states(self.pt_tree, i)
         return self.pt_tree, self.node_edge_state_m, self.node_state_m
     
     def get_internal_states(self, node, feat_id):

@@ -167,6 +167,7 @@ class build_edge_matrix:
             if not int(char) in char2ev:
                 char2ev[int(char)] = [(n1,n2,etype,ecount)]
             else: char2ev[int(char)].append((n1,n2,etype,ecount))
+        f.close()
         return char2ev
 
     def get_pt_dict(self,edges):
@@ -230,7 +231,6 @@ class build_edge_matrix:
     def get_edge_m(self,edge2char2val, edges, gt_start, gt_end,pt, out_f, is_internal = False):
         """generate for each edge a vector  of all characters"""
         #out_fo = open(out_f, 'w')
-        print gt_start, gt_end, "gt_start", "gt_end"
         out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start + 1)))
         out_m.index = ["_".join(e) for e in edges]
         out_m.columns = range(gt_start, gt_end) + [pt]
@@ -256,6 +256,7 @@ class build_edge_matrix:
         """for all phenotypes generate a edge based matrix"""
         for pt in range(pt_start, pt_end+1):
             #check if phenotype has any events associated with it
+            print "current phenotype is:", pt
             if pt not in self.char2ev:
                 print "phenotype", pt, "has no events associated with it. Skipping.."
                 continue

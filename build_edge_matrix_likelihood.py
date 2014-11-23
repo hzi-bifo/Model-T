@@ -2,6 +2,8 @@ import build_edge_matrix as bem
 import sys
 import named_narray as na
 import os
+#import faulthandler
+#faulthandler.enable()
 try:
     import dendropy as dp
 except ImportError:
@@ -184,4 +186,5 @@ if __name__ == '__main__':
                 os.mkdir(out)
     bem = build_edge_matrix_likelihood(t,f,n,p,e, use_likelihood=use_likelihood, use_gain_events=use_gain_events)
     bem.get_all_edge_m(g1,g2,pt1,pt2, out)
+    print "after get all edges"
 
