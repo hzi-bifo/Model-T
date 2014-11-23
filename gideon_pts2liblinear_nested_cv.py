@@ -20,7 +20,7 @@ params = {'loss':'l2', 'tol':0.000001, 'penalty':'l1', 'dual':False, 'fit_interc
 #c_params = [1,5,10,50,100]
 
 def write_miscl(miscl_plus,  model_out, pt_out):
-    gideon_f = open(, "r")
+    gideon_f = open(SP2TXID, "r")
     ls = gideon_f.readlines(SP2TXID)
     id2sp = {}
     f = open("%s/%s_miscl.txt"%(model_out,pt_out), 'w')
