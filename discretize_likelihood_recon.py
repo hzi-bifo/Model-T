@@ -137,6 +137,6 @@ if __name__=="__main__":
             dir2 = a
         if o == "-g":
             discretize_pt_only = True
-    threshold_matrix(dir1, t, out, dir2, discretize_pt_only = True)
+    threshold_matrix(dir1, t, out, dir2, discretize_pt_only = discretize_pt_only)
     #threshold_matrix("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_prob", t=0.5, outdir="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_prob0.5/")
     #threshold_matrix("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_prob",loss_dir2="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/loss_prob", t=0.5, outdir="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_loss_prob0.5/")
