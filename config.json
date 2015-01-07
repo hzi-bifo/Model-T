@@ -5,7 +5,7 @@
     #c parameters used for cv error estimation and majority feature selection
     "c_params": [0.02, 0.05],
     #number of classifiers used for majority feature selection (should be half of the number of c params for a real majority vote)
-    "k" : 1,
+    "k" : 2,
     #seed used to randomize the samples among other things
     "seed" : 0,
     #minimum number of samples required for a specific phenotypes

@@ -504,14 +504,17 @@ class nested_cv:
         baccs_s_np = np.array(baccs_s)[0:k,0:3].T
         baccs_s_np_p = ps.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
         ps.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
+        #write all the features with their weights to disk
+        rownames_extd = [str(baccs_s[i][3]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
+        models_df = ps.DataFrame(models)
+        models_df.columns = rownames_extd
+        for i in range(k):
+            models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
+        models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #write majority features with their weights to disk
         #print feats
         id2pf = ps.DataFrame(self.get_pfam_names_and_descs(feats))
-        models_df = ps.DataFrame(models)
-        for i in range(k):
-            models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         feat_df = ps.concat([id2pf.loc[:, feats], models_df.T.loc[:, feats]], axis = 0).T
-        rownames_extd = [str(baccs_s[i][3]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
         feat_df.columns = ["Pfam_acc", "Pfam_desc"] + rownames_extd
         columns_out = ["Pfam_acc"] + rownames_extd + ["Pfam_desc"]
         feat_df.to_csv("%s/%s_majority_features+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
@@ -519,7 +522,6 @@ class nested_cv:
         id2pf.loc[:, feats].T.to_csv("%s/%s_majority_features.txt"%(self.model_out,pt_out), float_format='%.3f',  sep = "\t")
         #write coefficient matrix to disk
         #put column names
-        ps.DataFrame(models).to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #pickle the predictors
         dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
     
