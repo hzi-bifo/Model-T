@@ -45,17 +45,6 @@ class pt_classification:
         self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer)
         if not os.path.exists(model_out):
             os.mkdir(model_out)
-        #DEPRECATED as not suitable for non-interactive runs
-        #else:
-        #    sys.stderr.write("warning output directory %s already exists\n"%model_out)
-        #    sys.stderr.write("determine what you want to do\n")
-        #    while True:
-        #        c = raw_input("press 0 for abort and 1 for overwrite (delete existing directory)\n")
-        #        if c == "0": 
-        #            sys.exit(1)
-        #        elif c == "1": 
-        #            shutil.rmtree(model_out, ignore_errors=True)
-        #            break 
         #write config to disk
         with open("%s/config.json" % self.model_out, 'w') as out_f:
             json.dump(self.config, out_f, indent=4, separators=(',', ': '))
