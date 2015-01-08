@@ -424,9 +424,11 @@ class nested_cv:
         y.index = x.index
         w.index = x.index
         y_p_t = y_p.copy()
+        #make sure the negative class label -1 instead of 0
         y_p_t[y_p_t == 0] = -1
         y_t = y.copy()
         y_t[y_t == 0] = -1
+        #compute balanced accuracy, positive and negative recall
         baccs = [self.bacc(self.recall_pos(y_p_t, all_preds.iloc[:,j]), self.recall_neg(y_p_t, all_preds.iloc[:,j])) for j in range(len(self.config['c_params']))]
         recps = [self.recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
         recns = [self.recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
@@ -451,9 +453,11 @@ class nested_cv:
         for i in range(k):
             predictor = svm.LinearSVC(C=baccs_s[i][3])
             predictor.set_params(**self.config["liblinear_params"])
+            #sample A features and B samples if the corresponding options are set
             sample_feats = sorted(random.sample(x.columns, int(math.floor(x.shape[1] * self.perc_feats))))
             sample_samples_p = sorted(random.sample(x_p.index, int(math.floor(x_p.shape[0] * self.perc_samples))))
             sample_samples = sorted(random.sample(x.index, int(math.floor(x.shape[0] * self.perc_samples))))
+            #train the full model with the k best models
             for l in range(no_classifier):
                 x_sub = x.loc[sample_samples, sample_feats]
                 y_t_sub = y_t.loc[sample_samples]
@@ -462,9 +466,10 @@ class nested_cv:
                     x_p_sub = x_p.loc[sample_samples_p, sample_feats]
                     y_p_t_sub = y_p_t.loc[sample_samples_p]
                     X = ps.concat([x_sub, x_p_sub], axis = 0)
+                    #add inverse features if the corresponding option is set
                     if self.inverse_feats:
-                        #add inverse features
                         X = ps.concat([X, 1 - X], axis = 1)
+                    #normalize if the corresponding option is set
                     if self.do_normalization:
                         X, _ = self.normalize(X)
                     #predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([balance_weights(w, y_t), balance_weights(ps.Series(np.ones(shape = len(y_p))), y_p_t)]))
@@ -473,10 +478,12 @@ class nested_cv:
                     if self.inverse_feats:
                         #add inverse features
                         x_sub =  ps.concat([x_sub, x_sub], axis = 1)
+                    #normalize if the corresponding option is set
                     if self.do_normalization:
                         x_sub, _ = self.normalize(x_sub)
                     predictor.fit(x_sub, y_t_sub, sample_weight = w_sub)
                     #save the model
+                #add inverse features if the corresponding option is set
                 if self.inverse_feats:
                     print "in inverse features mode"
                     #collapse extended feature space
@@ -489,14 +496,10 @@ class nested_cv:
                 else:
                     rel_weights = predictor.coef_
                 predictors.append(predictor)
-                print rel_weights
-                print rel_weights.shape
                 models[[np.array(sample_feats) - 1], i * no_classifier + l] = rel_weights 
         feats = []
         #determine the majority features 
         for i in range(models.shape[0]):
-            #print models.shape[1], 'number of classifiers'
-            #print math.ceil(k/2.0), 'threshold'
             if sum(models[i,:] > 0) >= math.ceil(k/2.0):
                 feats.append(i)
         rownames = [baccs_s[i][3] for i in range(k)] 
