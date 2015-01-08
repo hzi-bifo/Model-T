@@ -49,6 +49,7 @@ class pt_classification:
         with open("%s/config.json" % self.model_out, 'w') as out_f:
             json.dump(self.config, out_f, indent=4, separators=(',', ': '))
         #read in phyletic patterns
+        print phypat_f
         p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0, header = None)
         f = open("%s/cv_acc.txt"%self.model_out, "w")
         #create a directory for storing the pickled models
@@ -232,4 +233,5 @@ if __name__=="__main__":
             perc_feats = float(a)
         if o == "-e":
             inverse_feats = True
+    print config_f
     pt_cl = pt_classification(config_f = config_f, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization) 

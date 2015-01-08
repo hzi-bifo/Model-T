@@ -45,7 +45,6 @@ def threshold_matrix(dir1, outdir, loss_dir2=None, is_internal = False, t = None
                 if is_internal:
                     return m
                 continue
-            print "processing file %s/%s"%(loss_dir2, m_f)
             if t is None:
                 #combine gain and loss events
                 m = m1 + (1 - m1) * m2 
