@@ -63,7 +63,8 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
     while not os.path.exists("%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt")):
         if t == 60:
             sys.stderr.write("something went wrong while recomputing reconstruction in gainloss_dir %s" % gainloss_dir)
-            continue
+            sys.exit(1)
+            break 
         time.sleep(1) 
         t += 1
     #map pt events back to the tree
@@ -88,6 +89,8 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
             #gain events only case
             if likelihood_params["mode"] == "gain":
                 if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")):
+                    if 'gainLoss_ref' in config:
+                        shutil.rmtree(tmp_dir) 
                     raise ValueError("Phenotype has no events associated with it")    
                 m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "loss":
@@ -106,10 +109,14 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
             #loss events only case
             if likelihood_params["mode"] == "loss":
                 if not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+                    if 'gainLoss_ref' in config:
+                        shutil.rmtree(tmp_dir) 
                     raise ValueError("Phenotype has no events associated with it")    
                 m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
     if likelihood_params["mode"] == "gain_loss": 
         if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) or not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+            if 'gainLoss_ref' in config:
+                shutil.rmtree(tmp_dir) 
             raise ValueError("Phenotype has no events associated with it")  
         #gain and loss events combined
         if "continuous_target" in likelihood_params:
@@ -118,6 +125,8 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
             
         else:
             if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) or not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+                if 'gainLoss_ref' in config:
+                    shutil.rmtree(tmp_dir) 
                 raise ValueError("Phenotype has no events associated with it")  
             outdir_dlr = "%s/discretized_gain_loss"%tmp_dir
             if not os.path.exists(outdir_dlr):
