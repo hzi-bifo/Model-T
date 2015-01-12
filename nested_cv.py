@@ -52,7 +52,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer):
+    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -65,6 +65,7 @@ class nested_cv:
         self.perc_samples = perc_samples
         self.model_out = model_out
         self.cv_outer = cv_outer
+        self.resume = resume
 
     def transf_from_probs(self, x, y):
         """create a series of sample specific weights according to the probabilities"""

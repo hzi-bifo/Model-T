@@ -25,9 +25,10 @@ class pt_classification:
     
     
     
-    def __init__(self, config_f, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_samples = 1.0, perc_feats = 1.0, inverse_feats = False, do_normalization = False):
+    def __init__(self, config_f, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_samples = 1.0, perc_feats = 1.0, inverse_feats = False, do_normalization = False, resume = False):
         """main routine to prepare data for classification and feature selection"""
         self.model_out = model_out
+        self.resume = resume
         #read in configuration file
         c = [] 
         with open(config_f, 'r') as f:
@@ -42,7 +43,7 @@ class pt_classification:
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
-        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer)
+        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume)
         if not os.path.exists(model_out):
             os.mkdir(model_out)
         #write config to disk
@@ -51,9 +52,14 @@ class pt_classification:
         #read in phyletic patterns
         print phypat_f
         p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0, header = None)
-        f = open("%s/cv_acc.txt"%self.model_out, "w")
+        #check if this is a new run or if the current run shall be recomputed
+        if self.resume:
+            f = open("%s/cv_acc.txt"%self.model_out, "a")
+        else:
+            f = open("%s/cv_acc.txt"%self.model_out, "w")
         #create a directory for storing the pickled models
-        os.mkdir("%s/pickled"%self.model_out)
+        if not os.path.exists("%s/pickled"%self.model_out):
+            os.mkdir("%s/pickled"%self.model_out)
         #iterate over all phenotypes
         for pt in range(pt_start, pt_end+1):
             pt_out = pt
@@ -168,10 +174,11 @@ if __name__=="__main__":
 -p <range of phenotypes> to consider e.g 8550-8560
 -r <percentage of features> to to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included
 -c <inverse feats> if option set, extend the feature space in the classification by the inverse features (1-X) to get rid of noise features
+-h if set the program tries to resume the classification / feature selection i.e. the output directory already exists
         """ % (sys.argv[0])
         sys.exit(2)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "f:d:y:l:a:bv:i:cj:g:p:o:s:r:e")
+        optlist, args = getopt.getopt(sys.argv[1:], "f:d:y:l:a:bv:i:cj:g:p:o:s:r:eh")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
@@ -191,6 +198,7 @@ if __name__=="__main__":
     perc_samples = 1.0
     perc_feats = 1.0
     inverse_feats = False 
+    resume = False
     config_f = "/net/metagenomics/projects/phenotypes_20130523/code/learning/config.json"
 
     for o, a in optlist:
@@ -222,16 +230,18 @@ if __name__=="__main__":
             pt1, pt2 = [int(i) for i in a.split("-")]
         if o == "-o":
             out = a 
-            if os.path.exists(out):
-                sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
-                sys.exit(1)
-            else:
-                os.mkdir(out)
         if o == "-s":
             perc_samples = float(a)
         if o == "-r":
             perc_feats = float(a)
         if o == "-e":
             inverse_feats = True
+        if o == "-h":
+            resume = True
     print config_f
-    pt_cl = pt_classification(config_f = config_f, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization) 
+    if os.path.exists(out) and not resume:
+        sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
+        sys.exit(1)
+    else if not os.path.exists(out):
+        os.mkdir(out)
+    pt_cl = pt_classification(config_f = config_f, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization, resume = resume) 
