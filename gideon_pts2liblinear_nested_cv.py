@@ -242,6 +242,6 @@ if __name__=="__main__":
     if os.path.exists(out) and not resume:
         sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
         sys.exit(1)
-    else if not os.path.exists(out):
+    elif not os.path.exists(out):
         os.mkdir(out)
     pt_cl = pt_classification(config_f = config_f, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization, resume = resume) 
