@@ -111,11 +111,13 @@ class nested_cv:
         pfam_f.close()
         return id2pf
     
-    def recall_pos(self, y,y_pred):
+    @staticmethod 
+    def recall_pos(y,y_pred):
         """compute recall of the positive class"""
         return (y[y == 1] == y_pred[y==1]).sum()/float((y==+1).sum())
     
-    def recall_neg(self, y, y_pred):
+    @staticmethod 
+    def recall_neg(y, y_pred):
         """compute recall of the negative class"""
         return (y[y == -1] == y_pred[y==-1]).sum()/float((y==-1).sum())
     
