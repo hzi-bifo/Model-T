@@ -121,7 +121,16 @@ class nested_cv:
         """compute recall of the negative class"""
         return (y[y == -1] == y_pred[y==-1]).sum()/float((y==-1).sum())
     
-    def bacc(self, pos_acc, neg_acc):
+    @staticmethod 
+    def precision(y, y_pred):
+        """compute recall of the negative class"""
+        y_pred_neg = y_pred.copy()
+        y_pred_neg[y_pred == 1] = -1
+        y_pred_neg[y_pred == -1] = 1
+        return ((y[y == 1] == y_pred[y == 1]).sum())/float((y[y == 1] == y_pred[y == 1]).sum() + (y[y == -1] == y_pred_neg[y == -1]).sum())
+
+    @staticmethod
+    def bacc(pos_acc, neg_acc):
         """compute balanced accuracy"""
         return float(pos_acc + neg_acc)/2
     
