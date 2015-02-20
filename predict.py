@@ -7,7 +7,7 @@ import pandas as ps
 import sys
 import subprocess
 
-annotation_command = "python ~/code/cellulose_degraders/annotation/write_annot_array_script.py -d %(ORF_file)s -t %(annotation_out)s -s %(modes)s -f %(commands_out)s -h"
+annotation_command = "python ~/code/cellulose_degraders/annotation/write_annot_array_script.py -d %(ORF_file)s -t %(annotation_out)s -s %(modes)s -f %(commands_out)s -h "
 
 """predict new samples"""
 def normalize(test_data, norm_f):
@@ -72,7 +72,7 @@ def annotate_and_predict(pt_range, pfam_f, model_dir, test_data_f, ORF_f, modes,
     command = annotation_command % {"ORF_file":ORF_f, "annotation_out":"%s/annotation"%(out_dir), "commands_out":"%s/commands"%(out_dir), "modes":modes}
     if not resume:
         with open("out.txt", "w") as fnull:
-            result = subprocess.call(command,  stdout = fnull, stderr = fnull, shell = True)
+            result = subprocess.call(command,  stdout = sys.stdout, stderr = sys.stderr, shell = True)
     print command
     if not resume:
         os.system(command)
