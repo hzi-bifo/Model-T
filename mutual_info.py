@@ -1,26 +1,26 @@
 import numpy as np
 import math
+import sys
 
 class MutualInfo:
-    def joint_prob(self, x, y, z = None):
-        m = np.zeros(shape = (2,2,2))
-        z_is_none = False 
-        if z is None:
-            z = np.zeros(shape = x.shape)
-            z_is_none = True
-        for i, j, k in [(i,j,k) for i in range(2) for j in range(2) for k in range(2)]:
+    def joint_prob_3d(self, x, y, z):
+        m = np.zeros(shape = [len(np.unique(i)) for i in [x, y, z]])
+        for i, j, k in [(i,j,k) for i in range(m.shape[0]) for j in range(m.shape[1]) for k in range(m.shape[2])]:
             m[i,j,k] = ((x == i) & (y == j)  & (z == k)).sum() / float(x.shape[0])
-        if z_is_none:
-            return m[:, :, 0]
-        else:
-            return m
+        return m
+
+    def joint_prob(self, x, y):
+        m = np.zeros(shape = [len(np.unique(i)) for i in [x, y]])
+        for i, j in [(i,j) for i in range(m.shape[0]) for j in range(m.shape[1])]:
+            m[i,j] = ((x == i) & (y == j)).sum() / float(x.shape[0])
+        return m
 
     def prob(self, x):
-        return np.array([x[x==0].sum()/float(x.shape[0]), x[x==1].sum()/float(x.shape[0])])
+        return np.array([(x==i).sum()/float(x.shape[0]) for i in range(len(np.unique(x)))])
 
     def cond_prob(self, x, y):
-        m = np.zeros(shape = (2,2))
-        for i, j in [(i,j) for i in range(2) for j in range(2)]:
+        m = np.zeros(shape = [len(np.unique(i)) for i in [x, y]])
+        for i, j in [(i,j) for i in range(m.shape[0]) for j in range(m.shape[1])]:
             if (x == i).sum() == 0:
                 m[i, j] = 0
             m[i, j] = ((x == i) & (y == j)).sum() / float((x == i).sum())
@@ -31,7 +31,7 @@ class MutualInfo:
         px = self.prob(x)
         py = self.prob(y)
         MI_sum = 0
-        for i, j in [(i,j) for i in range(2) for j in range(2)]:
+        for i, j in [(i,j) for i in range(len(np.unique(x))) for j in range(len(np.unique(y)))]:
             if pxy[i,j] == 0:
                 continue
             if px[i] == 0:
@@ -43,11 +43,11 @@ class MutualInfo:
 
     def CMI(self, x, y, z):
         mi_sum = 0
-        pxyz = self.joint_prob(x, y, z)
+        pxyz = self.joint_prob_3d(x, y, z)
         pxz = self.joint_prob(x, z)
         pyz = self.joint_prob(y, z)
         pz = self.prob(z)
-        for i, j, k in [(i,j,k) for i in range(2) for j in range(2) for k in range(2)]:
+        for i, j, k in [(i,j,k) for i in range(len(np.unique(x))) for j in range(len(np.unique(y))) for k in range(len(np.unique(z)))]:
             if pxyz[i,j, k] == 0:
                 continue
             if pxz[i,k] == 0:
@@ -62,16 +62,16 @@ class MutualInfo:
 
     def entropy(self, x, y):
         pxy = self.joint_prob(x, y)
-        cond_pxy = self.cond_prob(x, y) 
+        cond_pyx = self.cond_prob(y, x) 
         entropy_sum = 0
-        for i, j in [(i,j) for i in range(2) for j in range(2)]:
+        for i, j in [(i,j) for i in range(len(np.unique(x))) for j in range(len(np.unique(y)))]:
             if pxy[i, j] == 0:
                 continue
-            if cond_pxy[i, j] == 0:
+            if cond_pyx[j, i] == 0:
                 continue
-            print pxy[i, j]
-            print cond_pxy[i, j]
-            entropy_sum += -pxy[i, j] * math.log(cond_pxy[i, j])
+            #print pxy[i, j]
+            #print cond_pxy[i, j]
+            entropy_sum += -pxy[i, j] * math.log(cond_pyx[j, i])
         return entropy_sum
 
 
@@ -84,10 +84,12 @@ class MutualInfo:
 if __name__ == "__main__":
     a = np.array([1, 1, 0])
     b = np.array([0, 1, 0])
-    c = np.array([1, 1, 1])
+    c = np.array([0, 2, 1])
     mi = MutualInfo()
     print "cond prob", mi.cond_prob(a, b)
     print "joint prob", mi.joint_prob(a, b)
+    print "joint prob 3d", mi.joint_prob_3d(a, b, c)
+    print "single prob", mi.prob(c)
     print "MI", mi.MI(a, b)
     print "CMI", mi.CMI(a, b, c)
     print "entropy", mi.entropy(a, b)
