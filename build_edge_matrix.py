@@ -231,9 +231,15 @@ class build_edge_matrix:
     def get_edge_m(self,edge2char2val, edges, gt_start, gt_end,pt, out_f, is_internal = False):
         """generate for each edge a vector  of all characters"""
         #out_fo = open(out_f, 'w')
-        out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start + 1)))
+        if not pt < gt_end:
+            out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start + 1)))
+        else:
+            out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start)))
         out_m.index = ["_".join(e) for e in edges]
-        out_m.columns = range(gt_start, gt_end) + [pt]
+        out_m.columns = range(gt_start, gt_end)
+        #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
+        if not pt < gt_end:
+            out_m.columns = out_m.columns + [pt]
         for e in edges:
             #s="%s\t"%str("_".join(e))
             for gt in range(gt_start, gt_end):
@@ -242,7 +248,10 @@ class build_edge_matrix:
                     #s+="%s\t"%edge2char2val[tuple(e)][gt]
                 #else:
                 #    s+="0\t"
-            if pt in edge2char2val[tuple(e)]:
+            #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
+            if pt > gt_end and pt in edge2char2val[tuple(e)]:
+                print "what"
+                sys.exit(1)
                 out_m.loc["_".join(e), pt] = edge2char2val[tuple(e)][pt]
                 #s+="%s\n"%edge2char2val[tuple(e)][pt]
             #else: s+="0\n"

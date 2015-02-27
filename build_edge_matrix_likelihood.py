@@ -94,26 +94,27 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
                         edge2char2val[isn][gt] = float(ev[3])
                     else:
                         edge2char2val[isn][gt] = float(ev[4]) 
-        #account for phenotype edges
-        for ev in char2ev[pt]:
-            if ev[0] in node2edge:
-                edge1 = node2edge[ev[0]]
-            else: continue
-            if ev[1] in node2edge:
-                edge2 = node2edge[ev[1]]
-            else: continue
-            isn = edge1.intersection(edge2).pop()
-            if isn in edge2char2val and pt not in edge2char2val[isn]:
-                if self.use_likelihood:
-                    edge2char2val[isn][pt] = float(ev[3])
-                else:
-                    edge2char2val[isn][pt] = float(ev[4])
+        #account for phenotype edges but only if this is an actual phenotype (no missing values involved)
+        if pt > gt_end:
+            for ev in char2ev[pt]:
+                if ev[0] in node2edge:
+                    edge1 = node2edge[ev[0]]
+                else: continue
+                if ev[1] in node2edge:
+                    edge2 = node2edge[ev[1]]
+                else: continue
+                isn = edge1.intersection(edge2).pop()
+                if isn in edge2char2val and pt not in edge2char2val[isn]:
+                    if self.use_likelihood:
+                        edge2char2val[isn][pt] = float(ev[3])
+                    else:
+                        edge2char2val[isn][pt] = float(ev[4])
 
-            elif isn in edge2char2val and pt  in edge2char2val[isn]:
-                if self.use_likelihood:
-                    edge2char2val[isn][pt] += float(ev[3]) * (1-edge2char2val[isn][pt])
-                else:
-                    edge2char2val[isn][pt] += float(ev[4])
+                elif isn in edge2char2val and pt  in edge2char2val[isn]:
+                    if self.use_likelihood:
+                        edge2char2val[isn][pt] += float(ev[3]) * (1-edge2char2val[isn][pt])
+                    else:
+                        edge2char2val[isn][pt] += float(ev[4])
 
 
         return edge2char2val
