@@ -6,6 +6,11 @@ import joblib
 import pandas as ps
 import sys
 import subprocess
+#check if gnu parallel is available otherise abort program
+test_parallel = subprocess.call("parallel -h", shell = True)
+print test_parallel
+if test_parallel != 255:
+    sys.exit("parallel not found; run importpackage parallel first")
 
 annotation_command = "python ~/code/cellulose_degraders/annotation/write_annot_array_script.py -d %(ORF_file)s -t %(annotation_out)s -s %(modes)s -f %(commands_out)s -h "
 
@@ -21,26 +26,42 @@ def predict(pt, model_dir, test_data):
     """predict the class label for test_data based on the given model"""
     pass
 
-def filter_pred(scores):
-    #print scores
-    if (scores > 0).all():
-        return scores.mean()
+def filter_pred(scores, is_majority):
+    """either do majority vote aggregation or conservative all or nothing vote"""
+    if is_majority:
+        if (scores >= 0).sum() > (k/2 + 1):
+            return scores[scores >= 0].mean()
+        else:
+            return ps.np.NaN
+    else:
+        if (scores >= 0).all():
+            return scores.mean()
+        else:
+            return ps.np.NaN
+    #else: 
+    #    if (scores >= 0).sum() != 0:
+    #        return (scores >= 0).sum()
+    #    else:
+    #        return ps.np.NaN
+
     #elif (scores < 0).all(): 
     #    return scores.mean()
-    else:
-        return ps.np.NaN
 
 def aggregate(pred_df, k):
     """restrict to positive predictions that are unique across all c params"""
-    maj_pred_df = ps.DataFrame(np.zeros(shape = (pred_df.shape[0], pred_df.shape[1] / k)))
+    maj_pred_dfs = [ps.DataFrame(np.zeros(shape = (pred_df.shape[0], pred_df.shape[1] / k))) for i in range(4)]
     for i in range(0, pred_df.shape[1], k):
-        #print i
-        #print "shape pred df", pred_df.shape, "maj_pred_df", maj_pred_df.shape
-        #print "filtered preds", pred_df.iloc[:, i : i + k].apply(filter_pred, axis = 1)
-        maj_pred_df.iloc[:,i / k] = pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1)
-        maj_pred_df.columns.values[i / k] = pred_df.columns.values[i].split("_")[0] 
-    print maj_pred_df
-    return maj_pred_df
+        for j in range(4):
+            maj_pred_dfs[j].columns.values[i / k] = pred_df.columns.values[i].split("_")[0] 
+        maj_pred_dfs[0].iloc[:,i / k] = pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1, is_majority = True)
+        maj_pred_dfs[1].iloc[:,i / k] = (pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1, is_majority = True) > 0).astype('int')
+        #voting committee
+        maj_pred_dfs[2].iloc[:,i / k] = pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1, is_majority = False) 
+        maj_pred_dfs[3].iloc[:,i / k] = (pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1, is_majority = False) > 0).astype('int')
+    maj_pred_dfs[1][maj_pred_dfs[1] == 0] = None 
+    maj_pred_dfs[3][maj_pred_dfs[3] == 0] = None 
+    return maj_pred_dfs
+    
 
     
 def majority_predict(pt, model_dir, test_data, k):
@@ -89,7 +110,13 @@ def annotate_and_predict(pt_range, pfam_f, model_dir, test_data_f, ORF_f, modes,
         print "calculation took:", time.time() - t
     pred_df.to_csv("%s/predictions.csv"%out_dir, sep = "\t", float_format='%.3f')
     #aggregate predictions
-    aggregate(pred_df, k).to_csv("%s/predictions_aggr.csv"%out_dir, sep = "\t", float_format='%.3f')
+    out = ["scores_majority-vote", "bin_majority-vote", "scores_conservative-vote", "bin_conservative-vote"]
+    aggr_dfs = aggregate(pred_df, k)
+    for i in range(len(out)):
+        if i % 2 == 0:
+            aggr_dfs[i].to_csv("%s/predictions_%s.csv"%(out_dir, out[i]), sep = "\t", float_format='%.3f')
+        else:
+            aggr_dfs[i].to_csv("%s/predictions_%s.csv"%(out_dir, out[i]), sep = "\t", float_format='%.0f')
     return pred_df
 
 
@@ -106,10 +133,10 @@ if __name__ == "__main__":
 -d <out dir> for the annotation
 -r put this option if the annotation is already complete and you only want to rerun the prediction e.g. within a different setting
 -k use <k> best classifiers for the prediction; will results in an error if there are model for less than 5 different c params
-        """ % (sys.argv[0])
+""" % (sys.argv[0])
         sys.exit(2)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "p:s:m:t:o:a:d:rk:")
+        optlist, args = getopt.getopt(sys.argv[1:], "p:s:m:t:o:a:d:rk:v")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
