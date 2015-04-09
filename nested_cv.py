@@ -112,10 +112,35 @@ class nested_cv:
         return id2pf
     
     @staticmethod 
+    def confusion_m(y,y_pred):
+        """get confusion matrix TN FP /n FN TP"""
+        TP = (y[y == 1] == y_pred[y == 1]).sum()
+        FN = (y[y == 1] != y_pred[y == 1]).sum()
+        TN = (y[y == -1] == y_pred[y == -1]).sum()
+        FP = (y[y == -1] != y_pred[y == -1]).sum()
+        return ps.np.array([TN, FP, FN, TP])
+
+    @staticmethod 
     def recall_pos(y,y_pred):
         """compute recall of the positive class"""
         return (y[y == 1] == y_pred[y==1]).sum()/float((y==+1).sum())
     
+    @staticmethod 
+    def recall_pos_conf(conf):
+        """compute recall of the positive class"""
+        TN, FP, FN, TP = conf
+        if (TP + FN) == 0:
+            float('nan') 
+        return TP/float(TP+FN)
+    
+    @staticmethod 
+    def recall_neg_conf(conf):
+        """compute recall of the positive class"""
+        TN, FP, FN, TP = conf
+        if (TN + FP) == 0:
+            return float('nan')
+        return TN/float(TN+FP)
+
     @staticmethod 
     def recall_neg(y, y_pred):
         """compute recall of the negative class"""
@@ -123,11 +148,19 @@ class nested_cv:
     
     @staticmethod 
     def precision(y, y_pred):
-        """compute recall of the negative class"""
-        y_pred_neg = y_pred.copy()
-        y_pred_neg[y_pred == 1] = -1
-        y_pred_neg[y_pred == -1] = 1
-        return ((y[y == 1] == y_pred[y == 1]).sum())/float((y[y == 1] == y_pred[y == 1]).sum() + (y[y == -1] == y_pred_neg[y == -1]).sum())
+        """compute precision"""
+        TP = (y[y == 1] == y_pred[y == 1]).sum()
+        FP = (y[y == -1] != y_pred[y == -1]).sum()
+        if (TP + FP) == 0:
+            return 0
+        return TP / float(TP + FP)   
+    @staticmethod 
+    def precision_conf(conf):
+        """compute precision"""
+        TN, FP, FN, TP = conf
+        if (TP + FP) == 0:
+            return float('nan')
+        return TP / float(TP + FP)
 
     @staticmethod
     def bacc(pos_acc, neg_acc):
