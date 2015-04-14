@@ -126,6 +126,8 @@ class SimulateDraftGenome:
         pt_gold_missing_m = ~ps.isnull(pt_gold_sel.loc[self.sp2gene.keys(), preds.columns])
         #get phenotypes that are completely absent in the gold standard
         pt_gold_absent = (~pt_gold_missing_m).apply(ps.np.all)
+        #get phenotypes that have less than x number of pos samples and y number of negative samples
+        pt_gold_too_few_samples = pt_gold_sel_model.apply(lambda x: ps.Series(((x[~ps.isnull(x) & (x < 0)].sum() <= -5) & (x[~ps.isnull(x) & (x > 0)].sum() >= 5))))
         #print "pt_gold_absent", pt_gold_absent
         #if not pt_gold_missing_m.all().all():
         #    print "no labels found for the input phenotypes in the gold standard"
@@ -179,7 +181,8 @@ class SimulateDraftGenome:
         #print "perf_per_pt", perf_per_pt
         perf_colnames = ["recall positive class", "recall negative class", "balanced accuracy", "precision"]
         #get macro measures 
-        macro_per_sp = ps.DataFrame(nanmean(perf_per_pt[:, (~pt_gold_absent).values, : ], axis = 1))
+        print ((~pt_gold_absent).values & pt_gold_too_few_samples).values
+        macro_per_sp = ps.DataFrame(nanmean(perf_per_pt[:, ((~pt_gold_absent) & pt_gold_too_few_samples).values[0], : ], axis = 1))
         macro_per_sp.index = sampling_points
         macro_per_sp.columns = perf_colnames 
         #get micro measures 
@@ -200,7 +203,7 @@ class SimulateDraftGenome:
          
                 
 
-    def predict_draft_genomes(self,data, pt1, pt2, k, mask_pts = None):
+    def predict_draft_genomes(self,data, pt1, pt2, k = 5, mask_pts = None):
         """for all the phenotypes and all simulated genomes get phenotype predictions"""
         self.pt_has_model = dict((i, False) for i in range(pt1, pt2 + 1)) 
         #restrict the data matrix to the pfams from the training data set
@@ -208,13 +211,16 @@ class SimulateDraftGenome:
         #instaniate a matrix for the individual predictions
         preds = ps.DataFrame(ps.np.zeros(shape = (len(self.sp2gene) * len(self.sample_points) * self.no_samples ,pt2 + 1 - pt1)))
         preds.columns = range(pt1, pt2 + 1)
+        print preds
         for pt in range(pt1, pt2 + 1):
             maj_pred = predict.majority_predict(pt, self.model_dir, data_train_pf, k)
             maj_preds_aggr = maj_pred.apply(lambda x: 1 if (x > 0).sum() > k/2  else -1, axis = 1)
             #if there is a model available fill in the phenotype prediction into the matrix
             if not len(maj_preds_aggr) == 0:
                 self.pt_has_model[pt] = True
-                preds.loc[:, pt] = maj_preds_aggr 
+                #set the corresponding entry in the prediction matrix, make sure that this is the value not a vector, will default to na (NASTY BUG)
+                preds.loc[:, pt] = maj_preds_aggr.values
+                print pt, maj_preds_aggr, "\n", preds.loc[:, pt]
         if not mask_pts is None:
             for pt in mask_pts:
                 self.pt_has_model[pt] = False
