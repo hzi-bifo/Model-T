@@ -48,7 +48,7 @@ def filter_pred(scores, is_majority):
     #    return scores.mean()
 
 def aggregate(pred_df, k):
-    """restrict to positive predictions that are unique across all c params"""
+    """employ different prediction strategies"""
     maj_pred_dfs = [ps.DataFrame(np.zeros(shape = (pred_df.shape[0], pred_df.shape[1] / k))) for i in range(4)]
     for i in range(0, pred_df.shape[1], k):
         for j in range(4):
@@ -58,8 +58,10 @@ def aggregate(pred_df, k):
         #voting committee
         maj_pred_dfs[2].iloc[:,i / k] = pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1, is_majority = False) 
         maj_pred_dfs[3].iloc[:,i / k] = (pred_df.iloc[:, i: i + k].apply(filter_pred, axis = 1, is_majority = False) > 0).astype('int')
-    maj_pred_dfs[1][maj_pred_dfs[1] == 0] = None 
-    maj_pred_dfs[3][maj_pred_dfs[3] == 0] = None 
+    maj_pred_dfs[0][maj_pred_dfs[0] == 0.0] = None 
+    maj_pred_dfs[1][maj_pred_dfs[1] == 0.0] = None 
+    maj_pred_dfs[2][maj_pred_dfs[2] == 0.0] = None 
+    maj_pred_dfs[3][maj_pred_dfs[3] == 0.0] = None 
     return maj_pred_dfs
     
 
@@ -143,6 +145,7 @@ if __name__ == "__main__":
         sys.exit(2)
     pt1 = pt2 = sum_f = model_dir = test_data_f = ORF_f = modes = out_dir = None
     resume = False
+    #default number of classifiers used for prediction 
     k = 5
     for o, a in optlist:
         if o == "-p":
