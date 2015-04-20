@@ -3,13 +3,22 @@ import numpy as np
 from ete2 import TreeNode, Tree
 #import dendropy as dp
 import sys
-
+PT_INDEX = 8476
 class node_anc_rec:
 
-    def __init__(self, tree_f, majority_feat_f, gain_m_f, loss_m_f, pfam_pts_f, pfam_ids_f, pt_id, feat_list):
+    def get_few_features(feats):
+        """reduce feats dataframe to those features that are non-zero for the smallest C param"""    
+        return feats 
+        
+
+    def __init__(self, tree_f, majority_feat_f, gain_m_f, loss_m_f, pfam_pts_f, pfam_ids_f, pt_id,  feat_list = None, feat_sel = "majority", is_reconstruction = False):
         #read in gain and loss event matrices 
         self.gain_m = ps.read_csv(gain_m_f, sep = "\t", index_col = 0, header = None)
+        #adjust index
+        self.gain_m.columns = [i-1 for i in self.gain_m.columns]
+        #adjust index
         self.loss_m = ps.read_csv(loss_m_f, sep = "\t", index_col = 0, header = None)
+        self.loss_m.columns = [i-1 for i in self.loss_m.columns]
         #reindex gain_m and loss_m by getting rid of the internal nodes
         self.gain_m.index = ["_".join((i.split("_")[0], i.split("_")[len(i.split("_")) - 1])) for i in self.gain_m.index.values]
         #########print ["_".join((i.split("_")[0], i.split("_")[len(i.split("_")) - 1])) for i in self.gain_m.index.values]
@@ -21,13 +30,24 @@ class node_anc_rec:
         #self.gain_m.rename(columns = {8478:8477}, inplace = True)
         #read in majority features
         if not majority_feat_f is None:
-            self.feats = ps.read_csv(majority_feat_f, index_col = 1, sep = "\t", header = True)
+            #majority features from the SVM
+            self.feats = ps.read_csv(majority_feat_f, index_col = 1, sep = "\t")
+            #this option is only feasible if the majority feat file contains the weights for the different C parameters
+            if feat_sel == "few":
+                self.feats = get_few_features(feats)
+            if is_reconstruction:
+                pf2id = ps.read_csv(pfam_ids_f, sep = "\t", index_col = 1)
+                self.feats.iloc[:, 0] = pf2id.loc[self.feats.index.values, :].iloc[:, 0] - 1
         else:
-            self.feats = ps.DataFrame(feat_list)
-            self.feats.index = self.feats.iloc[:, 0]
-        pf2id = ps.read_csv(pfam_ids_f, sep = "\t", header = None, index_col = 1)
-        self.feat_ids = pf2id.loc[self.feats.index.values, 0] 
-        self.feat_ids = self.feat_ids
+            #user list of feat ids
+            pf2id = ps.read_csv(pfam_ids_f, sep = "\t", index_col = 1)
+            self.feats = ps.DataFrame(pf2id.loc[feat_list, :])
+            #adjust index
+            self.feats = self.feats - 1
+            self.feats.index = feat_list
+        self.feat_ids = self.feats.iloc[:, 0].tolist() 
+        print self.feats
+        print self.feat_ids
         #prune full tree to pt tree
         self.pt_tree = self.prune(tree_f, self.gain_m.index.values)
         #print self.pt_tree.write(format = 8)
@@ -39,21 +59,28 @@ class node_anc_rec:
         self.node_edge_state_m = ps.DataFrame(np.zeros(shape = (len(node_names), self.feats.shape[0] + 1)))
         self.node_state_m.index = node_names
         self.node_edge_state_m.index = node_names
-        self.node_state_m.columns = self.feat_ids.append(ps.Series([8477]))
-        self.node_edge_state_m.columns = self.feat_ids.append(ps.Series([8477]))
+        self.node_state_m.columns = self.feat_ids + [PT_INDEX]
+        self.node_edge_state_m.columns = self.feat_ids + [PT_INDEX]
         #set leave node states
         pfam_pts_m = ps.read_csv(pfam_pts_f, sep = "\t",  index_col = 0, header = None)
         #convert int index into string index
         pfam_pts_m.index = [str(i) for i in pfam_pts_m.index.values]
+        pfam_pts_m.columns = [i - 1 for i in pfam_pts_m.columns]
+        #pfam_pts_m = (pfam_pts_m > 0).astype('int')
         #set node states of the leave nodes
         self.node_state_m.loc[self.pt_tree.get_leaf_names(), self.feat_ids] = pfam_pts_m.loc[self.pt_tree.get_leaf_names(), self.feat_ids]
-        self.node_state_m.loc[self.pt_tree.get_leaf_names(), 8477] = ps.Series(pfam_pts_m.loc[self.pt_tree.get_leaf_names(), pt_id + 1], dtype = 'int')
-        #print self.node_state_m.loc[:, 8477] 
+        print ps.Series(pfam_pts_m.loc[self.pt_tree.get_leaf_names(), pt_id], dtype = 'int')
+        print pfam_pts_m.shape
+        self.node_state_m.loc[self.pt_tree.get_leaf_names(), PT_INDEX] = ps.Series(pfam_pts_m.loc[self.pt_tree.get_leaf_names(), pt_id], dtype = 'int')
+        self.node_state_m.astype('int')
+        self.node_state_m[self.node_state_m > 0] = 1
+        self.node_state_m[self.node_state_m == 0] = 0
+        #print self.node_state_m.loc[:, PT_INDEX] 
 
 
     def reconstruct(self):
         #traverse tree to determine the internal node states based on the edge events
-        self.get_internal_states(self.pt_tree, 8477)
+        self.get_internal_states(self.pt_tree, PT_INDEX)
         for i in self.feat_ids:
             self.get_internal_states(self.pt_tree, i)
         return self.pt_tree, self.node_edge_state_m, self.node_state_m
@@ -125,7 +152,6 @@ class node_anc_rec:
     def prune(self, tree_f, edges): 
         pt_leaves = []
         #read in tree
-        ncbi_ids = tree_f
         t = TreeNode(tree_f,1)
         leaves_full_tree = set(t.get_leaf_names())
         #print t.write(format = 1)
