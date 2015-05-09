@@ -11,9 +11,11 @@ from joblib import Parallel, delayed, load, dump
 from operator import itemgetter
 import math
 import random
+random.seed(1)
 #initialize with seed
 #TODO put this into a class and use random state from gideon script
-random.seed(1)
+random_nested_cv = random.Random()
+random_nested_cv.seed(1)
 import cv_rec_helper as crh 
 import sys
 import itertools
@@ -202,8 +204,8 @@ class nested_cv:
             #select a subset of features for classification
             sample_feats = sorted(random.sample(x_train.columns, int(math.floor(x_train.shape[1] * self.perc_feats))))
             #select a subset of samples for classification
-            sample_samples = sorted(random.sample(x_train.index, int(math.floor(x_train.shape[0] * self.perc_samples))))
-            sample_samples_p = sorted(random.sample(xp_train.index, int(math.floor(xp_train.shape[0] * self.perc_samples))))
+            sample_samples = sorted(random_nested_cv.sample(x_train.index, int(math.floor(x_train.shape[0] * self.perc_samples))))
+            sample_samples_p = sorted(random_nested_cv.sample(xp_train.index, int(math.floor(xp_train.shape[0] * self.perc_samples))))
             #reduce feature space to the selected features
             x_train_sub = x_train.loc[sample_samples, sample_feats].copy()
             y_train_t_sub = y_train_t.loc[sample_samples]
@@ -500,8 +502,8 @@ class nested_cv:
             predictor.set_params(**self.config["liblinear_params"])
             #sample A features and B samples if the corresponding options are set
             sample_feats = sorted(random.sample(x.columns, int(math.floor(x.shape[1] * self.perc_feats))))
-            sample_samples_p = sorted(random.sample(x_p.index, int(math.floor(x_p.shape[0] * self.perc_samples))))
-            sample_samples = sorted(random.sample(x.index, int(math.floor(x.shape[0] * self.perc_samples))))
+            sample_samples_p = sorted(random_nested_cv.sample(x_p.index, int(math.floor(x_p.shape[0] * self.perc_samples))))
+            sample_samples = sorted(random_nested_cv.sample(x.index, int(math.floor(x.shape[0] * self.perc_samples))))
             #train the full model with the k best models
             for l in range(no_classifier):
                 x_sub = x.loc[sample_samples, sample_feats]

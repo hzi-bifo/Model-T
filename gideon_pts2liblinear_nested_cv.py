@@ -6,6 +6,7 @@ import shutil
 import getopt
 import pandas as ps
 import random
+random.seed(0)
 import json
 
 class pt_classification:
@@ -23,7 +24,14 @@ class pt_classification:
             f.write("%s\t%s\t%s\t%s\n"%(miscl_plus.index[i], miscl_plus.iloc[i,0], miscl_plus.iloc[i,1], id2sp[miscl_plus.index[i]]))
         f.close()
     
+    def setup_folds_synthetic(self, x, folds):
+        #short folds length
+        f = x / folds
+        #number of extended folds
+        f_e = x % folds
+        return (folds - f_e, x - f, f_e, ((x - (f + 1))))
     
+
     
     def __init__(self, config_f, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_samples = 1.0, perc_feats = 1.0, inverse_feats = False, do_normalization = False, resume = False):
         """main routine to prepare data for classification and feature selection"""
@@ -38,7 +46,7 @@ class pt_classification:
                     c.append(l.strip())
         #parse pure json
         self.config = json.loads("\n".join(c))
-        random.seed(self.config["seed"])
+        #random.seed(self.config["seed"])
         #check if we want to do nested cross validation accuracy estimation
         is_rec_based = False
         if not rec_dir is None:
@@ -154,6 +162,21 @@ class pt_classification:
                 f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
                 f.flush()
             all_preds = ps.DataFrame(self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out))
+            #temporary hack to the get random generator into place
+            folds = self.setup_folds_synthetic(len(x), cv_outer)
+            #folds_inner = self.setup_folds_synthetic(folds[1], 10)
+            #folds_inner_extd = self.setup_folds_synthetic(folds[3], 10)
+            #outer_subsampling = folds[0] * folds[1] + folds[2] * folds[3]
+            #inner_subsampling = folds[0] * (folds_inner[0] * folds_inner[1] + folds_inner[2] * folds_inner[3]) * (len(self.config['c_params'] )+ 1)
+            #for i in range(2 * (outer_subsampling + inner_subsampling + inner_subsampling_extd + outer_subsampling)):
+            #    random.randint(0,9)
+            #inner_subsampling_extd = folds[2] * (folds_inner_extd[0] * folds_inner_extd[1] + folds_inner_extd[2] * folds_inner_extd[3]) * (len(self.config['c_params']) + 1)
+            #additional c param
+            for i in range(8476 * (10 + 10 * 10)):
+                random.randint(0,9)
+            #skip nested cv
+            #for i in range(8476 * (10 + 10 + 10 * 10 * (len(self.config['c_params']) + 1)) ):
+            #    random.randint(0,9)
             self.ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, self.config['k'], pt_out)
         f.close()
 if __name__=="__main__":
