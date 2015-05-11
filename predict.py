@@ -29,7 +29,7 @@ def predict(pt, model_dir, test_data):
 def filter_pred(scores, is_majority):
     """either do majority vote aggregation or conservative all or nothing vote"""
     if is_majority:
-        if (scores > 0).sum() > (k/2 + 1):
+        if (scores > 0).sum() >= (k/2 + 1):
             return scores[scores >= 0].mean()
         else:
             return ps.np.NaN
