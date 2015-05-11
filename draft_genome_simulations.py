@@ -13,11 +13,13 @@ from scipy.stats import nanmean
 UID2FN = "/net/metagenomics/data/genomes/public/NCBI20140115_FAAs_uid2fn.txt"
 class SimulateDraftGenome:
 
-    def __init__(self, sample_points, no_samples, refseq_annot_fs, refseq_f, pfam_acc_f, model_dir, train_pfam_f, sp2str_f):
+    def __init__(self, sample_points, no_samples, refseq_annot_fs, refseq_f, pfam_acc_f, model_dir, train_pfam_f, sp2str_f, min_samples):
         self.sample_points = sample_points
         self.no_samples = no_samples
         self.model_dir = model_dir
         self.train_pfam_f = train_pfam_f
+        #minimum number of samples per phenotype + and - class 
+        self.min_samples = min_samples
         fs = [i.strip() for i in open(refseq_annot_fs, 'r').readlines()]
         annot, self.gene2hmm, self.rs2f = domtblout2gene.gene2hmm(fs, pfam_acc_f)
         #read the species to strain mapping and infer a species2gene dictionary  
@@ -127,7 +129,7 @@ class SimulateDraftGenome:
         #get phenotypes that are completely absent in the gold standard
         pt_gold_absent = (~pt_gold_missing_m).apply(ps.np.all)
         #get phenotypes that have less than x number of pos samples and y number of negative samples
-        pt_gold_too_few_samples = pt_gold_sel_model.apply(lambda x: ps.Series(((x[~ps.isnull(x) & (x < 0)].sum() <= -5) & (x[~ps.isnull(x) & (x > 0)].sum() >= 5))))
+        pt_gold_too_few_samples = pt_gold_sel_model.apply(lambda x: ps.Series(((x[~ps.isnull(x) & (x < 0)].sum() <= -5) & (x[~ps.isnull(x) & (x > 0)].sum() >= self.min_samples))))
         #print "pt_gold_absent", pt_gold_absent
         #if not pt_gold_missing_m.all().all():
         #    print "no labels found for the input phenotypes in the gold standard"
@@ -258,15 +260,16 @@ if __name__ == '__main__':
 -i <mapping file> that maps phenotypes to the internally used ids
 -e <mapping file> that maps RefSeqProIds to species
 -o <outdir> for macro, micro accuracy etc. 
+-n <number> of samples required for the phenotype + and - class to be considered in the macro accuracy computation
 """ % (sys.argv[0])
         sys.exit(1)
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], "s:p:g:m:r:a:b:c:d:i:e:o:k:")
+        optlist, args = getopt.getopt(sys.argv[1:], "s:p:g:m:r:a:b:c:d:i:e:o:k:n:")
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
         sys.exit(2)
-    no_samples = sampling_points = gff_targz = pfam_acc_f = model_dir = refseq_annot_fs = refseq_f = tr_pfams_f = pt_gold_f = pt2id_f = sp2str_f = outdir = mask_pts = None
+    no_samples = sampling_points = gff_targz = pfam_acc_f = model_dir = refseq_annot_fs = refseq_f = tr_pfams_f = pt_gold_f = pt2id_f = sp2str_f = outdir = mask_pts = min_samples = None
     for o, a in optlist:
         if o == "-b":
             pt1, pt2 = [int(i) for i in a.split("-")]
@@ -296,6 +299,8 @@ if __name__ == '__main__':
             mask_pts = [int(i) for i in a.split(",")]
         if o == "-o":
             outdir = a
+        if o == "-n":
+            min_samples = int(a)
     import os
     if os.path.exists(outdir):
         sys.stderr.write("outdir %s already exists"%outdir)
@@ -303,7 +308,7 @@ if __name__ == '__main__':
     else:
         os.mkdir(outdir)
 
-    simulator = SimulateDraftGenome(sampling_points, no_samples, refseq_annot_fs, refseq_f, pfam_acc_f,  model_dir, tr_pfams_f, sp2str_f)
+    simulator = SimulateDraftGenome(sampling_points, no_samples, refseq_annot_fs, refseq_f, pfam_acc_f,  model_dir, tr_pfams_f, sp2str_f, min_samples)
     data = simulator.simulate_draft_genomes()
     preds = simulator.predict_draft_genomes(data, pt1, pt2, 5, mask_pts)
     simulator.evaluate_draft_genome_preds(preds, pt_gold_f, pt2id_f, outdir)
