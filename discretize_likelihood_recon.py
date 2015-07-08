@@ -53,30 +53,31 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 continue
             print "processing file %s/%s"%(loss_dir2, m_f)
             #drop condition for m1 where the pt is non-zero but does not exceed the threshold
-            drop_m1 = ~((m1.iloc[:,m1.shape[1] - 1] != 0) & (m1.iloc[:,m1.shape[1] - 1] < t)) 
+            #join gains and losses
+            m = m1 + (1 - m1) * m2 
+            drop_m = ~((m.iloc[:,m.shape[1] - 1] != 0) & (m.iloc[:,m.shape[1] - 1] < t)) 
+            #drop condition for m2
+            #drop_m2 = ~((m2.iloc[:,m2.shape[1] - 1] != 0) & (m2.iloc[:,m2.shape[1] - 1] < t)) 
             #set all elements greater or equal the threshold to 1
             if discretize_pt_only:
-                m1.loc[m1.iloc[:, m1.shape[1] - 1] >= t, m1.shape[1]] = 1
-                m2.loc[m2.iloc[:, m2.shape[1] - 1] >= t, m2.shape[1]] = 1
-                m = m1 + (1 - m1) * m2 
+                #m1.loc[m1.iloc[:, m1.shape[1] - 1] >= t, m1.shape[1]] = 1
+                m.loc[m.iloc[:, m.shape[1] - 1] >= t, m.shape[1]] = 1
                 #print m.iloc[:, m.shape[1] - 1]
             else:
-                m1[m1>=t] = 1
-                m1[m1<t] = 0
-                m2[m2>=t] = 1
-                m2[m2<t] = 0
-                m = m1 + m2
-            #drop condition for m2
-            drop_m2 = ~((m2.iloc[:,m2.shape[1] - 1] != 0) & (m2.iloc[:,m2.shape[1] - 1] < t)) 
+                m[m>=t] = 1
+                m[m<t] = 0
+                #m2[m2>=t] = 1
+                #m2[m2<t] = 0
+                #m = m1 + m2
             s = m.shape
             #write to file all those samples that have been dropped due to unclear phenotype status
             #TODO not yet tested
             f = open(os.path.join(outdir, "%s_%s" %(m_f, "dropped_samples.txt")), 'w')
-            for i in m[~(drop_m1 & drop_m2 | (m.iloc[:,m.shape[1] - 1] >= 1))].index:
+            for i in m[~(drop_m | (m.iloc[:,m.shape[1] - 1] >= 1))].index:
                 f.write("%s\n"%i)
             f.close()
             #combine the two conditions
-            m = m[drop_m1 & drop_m2 | (m.iloc[:,m.shape[1] - 1] >= 1)]
+            m = m[drop_m| (m.iloc[:,m.shape[1] - 1] >= 1)]
             if discretize_pt_only:
                 print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
             print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
@@ -90,7 +91,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 #        print m1.loc[i][m1.loc[i] > t]
                 #        print m2.loc[i][m2.loc[i] > t]
                 #sys.stderr.write("matrix m1 and m2 incompatible with threshold %s\n"%t)
-                #raise Exception
+                #RAISe Exception
             #TODO only write to file if the call is external i.e. in the bulk discretization run
             m.to_csv(os.path.join(outdir, m_f), sep="\t", header=None, index=True)
             if is_internal:
