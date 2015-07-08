@@ -62,10 +62,11 @@ if __name__ == "__main__":
     parser.add_argument("pf_pt_matrix", help='combined matrix of pfams and phenotypes')
     parser.add_argument('pt_start', help = "the index of the first pt column to consider", type = int)
     parser.add_argument('pt_stop',  help='the index of the last pt column to consider', type = int)
-    parser.add_argument('-m', '--mask_pts',  help="a comma separated list of phenotype ids that should be discarded", default = "")
+    parser.add_argument('-m', '--mask_pts', default = [],  help="a comma separated list of phenotype ids that should be discarded")
     args = parser.parse_args()
-    mask_pts = [int(i) for i in args.mask_pts.split(",")]
-    collect_miscl(args.miscl_in_dir, args.pf_pt_matrix, args.pt_start, args.pt_stop, args.out_dir, mask_pts)
+    if not args.mask_pts == []:
+        args.mask_pts = [int(i) for i in args.mask_pts.split(",")]
+    collect_miscl(args.miscl_in_dir, args.pf_pt_matrix, args.pt_start, args.pt_stop, args.out_dir, args.mask_pts)
     #collect_miscl(".", "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts_counts_named.tsv", 8476, 8568, 8569, "./")
     #collect_miscl(".", "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/pfams_pts_bin_named.tsv", 8476, 8568, 8569, "misclassified.tsv")
 
