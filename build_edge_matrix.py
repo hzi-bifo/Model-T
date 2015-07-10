@@ -233,13 +233,12 @@ class build_edge_matrix:
         #out_fo = open(out_f, 'w')
         if not pt < gt_end:
             out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start + 1)))
+            out_m.columns = range(gt_start, gt_end) + [pt]
         else:
             out_m = ps.DataFrame(np.zeros(shape = (len(edges), gt_end - gt_start)))
+            out_m.columns = range(gt_start, gt_end)
         out_m.index = ["_".join(e) for e in edges]
-        out_m.columns = range(gt_start, gt_end)
         #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
-        if not pt < gt_end:
-            out_m.columns = out_m.columns + [pt]
         for e in edges:
             #s="%s\t"%str("_".join(e))
             for gt in range(gt_start, gt_end):
@@ -249,14 +248,14 @@ class build_edge_matrix:
                 #else:
                 #    s+="0\t"
             #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
-            if pt > gt_end and pt in edge2char2val[tuple(e)]:
-                print "what"
-                sys.exit(1)
+            if pt > gt_end - 1 and pt in edge2char2val[tuple(e)]:
+                print "this shouldn't happen"
+                sys.exit(0)
                 out_m.loc["_".join(e), pt] = edge2char2val[tuple(e)][pt]
                 #s+="%s\n"%edge2char2val[tuple(e)][pt]
-            #else: s+="0\n"
-            #out_fo.write(s)
-        out_m.to_csv(out_f, sep = "\t", header = False)
+                #else: s+="0\n"
+                #out_fo.write(s)
+        out_m.to_csv(out_f, sep = "\t", header = None)
         if is_internal: 
             return out_m 
 
@@ -271,7 +270,7 @@ class build_edge_matrix:
             edges = self.get_edges(pt)
             pt_dict = self.get_pt_dict(edges)
             #plus one because we want to include column gt_end
-            edge2char2val =self.map_events(pt_dict, gt_start, gt_end + 1, self.char2ev,pt, edges)
+            edge2char2val = self.map_events(pt_dict, gt_start, gt_end + 1, self.char2ev,pt, edges)
             m = self.get_edge_m(edge2char2val, edges, gt_start, gt_end + 1, pt, "%s/pt%s.dat"%(out_dir,pt), is_internal = is_internal)
             if is_internal:
                 return m

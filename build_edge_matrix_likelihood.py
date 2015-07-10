@@ -65,7 +65,7 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
         for e in edges:
             edge2char2val[tuple(e)] = {}
         #map/match genotype to phenotype edges
-        for gt in range(gt_start, gt_end+1):
+        for gt in range(gt_start, gt_end):
             #TODO account for what happen if there are no events
             if not gt in char2ev:
                 continue
@@ -95,7 +95,7 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
                     else:
                         edge2char2val[isn][gt] = float(ev[4]) 
         #account for phenotype edges but only if this is an actual phenotype (no missing values involved)
-        if pt > gt_end:
+        if pt > gt_end - 1:
             for ev in char2ev[pt]:
                 if ev[0] in node2edge:
                     edge1 = node2edge[ev[0]]
