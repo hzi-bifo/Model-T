@@ -1,11 +1,11 @@
 {
     #parameters for the sklearn liblinear wrapper
     "liblinear_params" : {"loss":"l2", "tol":0.000001, "penalty":"l1", "dual": false, "fit_intercept": true, "intercept_scaling":1, "class_weight":"auto", "random_state": 1},
-    #"c_params": [ 0.001, 0.002, 0.005, 0.007, 0.01, 0.02, 0.05, 0.07, 0.1, 0.2, 0.5, 0.7, 1],
+    "c_params": [ 0.001, 0.002, 0.005, 0.007, 0.01, 0.02, 0.05, 0.07, 0.1, 0.2, 0.5, 0.7, 1],
     #c parameters used for cv error estimation and majority feature selection
-    "c_params": [0.02, 0.05],
+    #"c_params": [0.02, 0.05],
     #number of classifiers used for majority feature selection (should be half of the number of c params for a real majority vote)
-    "k" : 2,
+    "k" : 13,
     #seed used to randomize the samples among other things
     "seed" : 0,
     #minimum number of samples required for a specific phenotypes
@@ -27,7 +27,7 @@
     #exectutable of the gainLoss program required for maximum likelihood reconstructions
     "gainLoss" : "~/software/GLOOME/gainLoss.VR01.266.dRep",
     #reference directory with precomputed folds from another run of the feature selection / classification pipeline
-    "gainLoss_ref" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/likelihood/ll_loss_threshold0.2_propercv_featperc1.0nl_pt8992_i2_v2_ref",
+    "gainLoss_ref" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/likelihood/ll_gain_loss_threshold0.1_percfeat1.0_shuffled_testref/",
     #binary phyletic patterns
     "phym_f" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfams_pts_bin.tsv",
     #list of taxa ids

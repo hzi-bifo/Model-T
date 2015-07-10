@@ -441,8 +441,8 @@ class nested_cv:
         
         folds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
         #for i in folds:
-        #    for j in i:
-                #print j.shape
+        #    for j in i: 
+        #print j.shape
         all_preds = np.zeros(shape=[len(y_p), len(self.config['c_params'])])
         #TODO account for the case when folds exceeds number of samples
         for j in range(len(self.config['c_params'])):
@@ -497,6 +497,19 @@ class nested_cv:
         #y_t = y_t[index_vector]
         #w = w[index_vector]
         #END EXPERIMENTAL
+        #recompute phenotype reconstruction
+        #if 'gainLoss_ref' in self.config:
+        #    gainloss_ref = self.config['gainLoss_ref']
+        #    del self.config['gainLoss_ref']
+        #y_p[y_p == -1] = 0 
+        #y_new = crh.reconstruct_pt_likelihood(y_p, self.model_out, self.config, self.likelihood_params, pt_out, ofold = "_ptreconstruction", ifold = None) 
+        #print "old phenotype reconstruction", y, y.index
+        #print "new phenotype reconstruction", y_new, y_new.index
+        #y = y_new.loc[y.index, :]
+        #y[y == 0] = -1
+        #y_p[y_p == 0] = -1
+        #if 'gainLoss_ref' in config:
+        #    self.config['gainLoss_ref'] = gain_loss_ref
         for i in range(k):
             predictor = svm.LinearSVC(C=baccs_s[i][3])
             predictor.set_params(**self.config["liblinear_params"])

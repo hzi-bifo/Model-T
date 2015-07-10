@@ -17,6 +17,10 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
         model_out_temp = model_out
         #set output directory for the reconstruction to the reference
         model_out = config['gainLoss_ref']
+    else:
+        tmp_dir = os.path.join(model_out, "nobackup")
+        if not os.path.exists(tmp_dir):
+            os.mkdir(tmp_dir)
     gainloss_dir = os.path.join(model_out, "gainLoss_pt%s_ofold%s" %(pt_out, ofold))
     if not ifold is None:
         gainloss_dir = "%s_ifold%s"%(gainloss_dir, ifold) 
@@ -131,7 +135,7 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
                 os.mkdir(outdir_dlr)
             m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l, is_internal = True) 
     #drop first column that is due to genotype reconstruction and either empty or duplicate of phenotype column
-    m = ps.DataFrame(m.iloc[:, 1] )
+    m = ps.DataFrame(m.iloc[:, 0] )
     #delete reconstruction directory if a reconstruction reference directory was used
     if 'gainLoss_ref' in config:
         shutil.rmtree(tmp_dir) 

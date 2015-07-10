@@ -263,7 +263,7 @@ if __name__=="__main__":
             resume = True
     print config_f
     if os.path.exists(out) and not resume:
-        sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
+        sys.stderr.write("output directory %s already exists; delete and rerun\n"%out)
         sys.exit(1)
     elif not os.path.exists(out):
         os.mkdir(out)
