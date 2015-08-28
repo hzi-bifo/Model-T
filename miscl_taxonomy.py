@@ -2,6 +2,7 @@
 import pandas as ps
 import ete2
 import nested_cv
+import sys
 
 def macro_accuracy(numbers):
     POS, NEG, FN, FP = numbers
@@ -47,7 +48,7 @@ def map_miscl2taxonomy(miscl_m_dir, out_dir):
     #produce results files
     for i in keys:
         per_pt_extd_dict[i].to_csv("%s/%s_extd.tsv"%(out_dir, i), sep = "\t")
-    #compute macro accuracy if there is at least 5 samples for this taxon
+    #compute macro accuracy if there is at least 10 samples in positive and negative class for this taxon
     macro_df =  ps.DataFrame(ps.np.zeros(shape = (len([j for j in ncbi_tree.traverse()]), len(per_pt_dict["FN"].columns))))
     macro_df.index = per_pt_extd_dict["FN"].index
     macro_df.columns = per_pt_extd_dict["FN"].columns

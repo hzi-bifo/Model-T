@@ -25,8 +25,10 @@ def collect_miscl(miscl_dir, pt_matrix_f, pt1, pt2, out_dir, mask_pts):
                 miscl = ps.read_csv("%s/%s_miscl.txt"%(miscl_dir, i), sep = "\t", header = None, index_col = 0)
             except ValueError:
                 print "phenotype", i, "has no misclassified samples"
+                continue
         else: 
             continue
+
 
         for j in miscl.index:
             if miscl.loc[j, 1] == 1.0:
