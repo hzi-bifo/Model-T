@@ -19,7 +19,10 @@ class pt_classification:
         f = open("%s/%s_miscl.txt"%(model_out, pt_out), 'w')
         for i in range(len(ls)):
             elems = ls[i].strip().split("\t")
-            id2sp[int(elems[1])] = elems[0]
+            if type(elems[1]) != type(3):
+                id2sp[elems[1]] = elems[0]
+            else:
+                id2sp[int(elems[1])] = elems[0]
         for i in range(miscl_plus.shape[0]):
             f.write("%s\t%s\t%s\t%s\n"%(miscl_plus.index[i], miscl_plus.iloc[i,0], miscl_plus.iloc[i,1], id2sp[miscl_plus.index[i]]))
         f.close()
