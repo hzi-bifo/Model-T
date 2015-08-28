@@ -497,19 +497,6 @@ class nested_cv:
         #y_t = y_t[index_vector]
         #w = w[index_vector]
         #END EXPERIMENTAL
-        #recompute phenotype reconstruction
-        #if 'gainLoss_ref' in self.config:
-        #    gainloss_ref = self.config['gainLoss_ref']
-        #    del self.config['gainLoss_ref']
-        #y_p[y_p == -1] = 0 
-        #y_new = crh.reconstruct_pt_likelihood(y_p, self.model_out, self.config, self.likelihood_params, pt_out, ofold = "_ptreconstruction", ifold = None) 
-        #print "old phenotype reconstruction", y, y.index
-        #print "new phenotype reconstruction", y_new, y_new.index
-        #y = y_new.loc[y.index, :]
-        #y[y == 0] = -1
-        #y_p[y_p == 0] = -1
-        #if 'gainLoss_ref' in config:
-        #    self.config['gainLoss_ref'] = gain_loss_ref
         for i in range(k):
             predictor = svm.LinearSVC(C=baccs_s[i][3])
             predictor.set_params(**self.config["liblinear_params"])
@@ -577,6 +564,7 @@ class nested_cv:
         #write majority features with their weights to disk
         #print feats
         id2pf = ps.DataFrame(self.get_pfam_names_and_descs(feats))
+        print id2pf
         feat_df = ps.concat([id2pf.loc[:, feats], models_df.T.loc[:, feats]], axis = 0).T
         feat_df.columns = ["Pfam_acc", "Pfam_desc"] + rownames_extd
         columns_out = ["Pfam_acc"] + rownames_extd + ["Pfam_desc"]
