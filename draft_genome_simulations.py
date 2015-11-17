@@ -1,5 +1,5 @@
 """script to simulate genomes with incomplete gene sets from fully sequenced genomes"""
-import predict
+from traitar import predict
 import domtblout2gene
 import random 
 import math
@@ -70,7 +70,8 @@ class SimulateDraftGenome:
                 cur_sample_point = sample_points_t.pop()
                 #create a vector to store the genome annotations
                 cur_sample_series = m.iloc[0, ].copy()
-                #draw a samples of genes with the same size 
+                #draw samples of genes with the same size 
+                random.seed()
                 genes = random.sample(self.sp2gene[self.sp2gene.keys()[j]], len(self.sp2gene[self.sp2gene.keys()[j]])) 
                 #print "total number of genes", len(genes)
                 #draw random sample
@@ -264,7 +265,7 @@ if __name__ == '__main__':
     parser.add_argument("outdir", help='out_dir for macro, micro accuracy etc.')
     parser.add_argument("sp2str_f", help='mapping file that maps RefSeqProIds to species')
     parser.add_argument("min_samples", help='number of samples required for the phenotype + and - class to be considered in the macro accuracy computation', type = int)
-    parser.add_argument("mask_pts", help='mask those phenotypes e.g. 8476,8521,8533')
+    parser.add_argument("--mask_pts", default = None, help='mask those phenotypes e.g. 8476,8521,8533')
     parser.add_argument("--adjust_bias", help='if set adjust the bias term according to the percentage of genes retained', action = 'store_true')
     args = parser.parse_args()
     pt1, pt2 = [int(i) for i in args.pt_range.split("-")]
