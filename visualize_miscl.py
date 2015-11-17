@@ -12,7 +12,7 @@ def map_bacc2color(val, minval, maxval):
     #if minval is not in the prespecified range set to minvalue; same for max value
     if val < minval:
         val = minval
-    if val > minval:
+    if val > maxval:
         val = maxval
     h = (138 - (1 - (float(val-minval) / (maxval-minval))) * 74) / 360
     s = (69.9 - (1 - (float(val-minval) / (maxval-minval))) * 42.3) / 100 
@@ -29,11 +29,15 @@ def miscl_layout(node):
         name_face = AttrFace("miscl_full", fsize = 10)
         faces.add_face_to_node(name_face, node, column=0, position="branch-right")
     if not ps.isnull(miscl_phypat_ml.loc[node.name, '0']): 
-        c_mp = CircleFace( radius = 10, style="sphere", color = map_bacc2color(miscl_phypat_ml.loc[node.name, '0'], 0.8, 1.0))
-        c_p = CircleFace( radius = 10, style="sphere", color = map_bacc2color(miscl_phypat.loc[node.name, '0'], 0.8, 1.0))
+        #make size of radius depend on number of samples per clade
+        radius = 8 + (8 * min(miscl_phypat_ml.loc[node.name, 'gc'], 80) / 80)
+        #make size of radius depend on number of labels per clade
+        #radius = 8 + (8 * min(miscl_phypat_ml.loc[node.name, 'positve_samples'] + miscl_phypat_ml.loc[node.name, 'negative_samples'], 4000) / 4000)
+        c_mp = CircleFace( radius = radius , color = map_bacc2color(miscl_phypat_ml.loc[node.name, '0'], 0.75, 1.0))
+        c_p = CircleFace( radius = radius, color = map_bacc2color(miscl_phypat.loc[node.name, '0'], 0.75, 1.0))
     else:
-        c_mp = CircleFace( radius = 10, style="sphere", color = 'grey')
-        c_p = CircleFace( radius = 10, style="sphere", color = 'grey')
+        c_mp = CircleFace( radius = 8, color = 'grey')
+        c_p = CircleFace( radius = 8,  color = 'grey')
     c_p.opacity = 0.9
     c_mp.opacity = 0.9
  
@@ -51,7 +55,6 @@ if __name__ == "__main__":
     parser.add_argument("out_f", help='output image path')
     args = parser.parse_args()
     miscl_phypat = ps.read_csv(args.phypat, index_col = 0, sep = "\t")
-    print miscl_phypat
     miscl_phypat_ml = ps.read_csv(args.phypat_ml, index_col = 0, sep = "\t")
     t = ete2.Tree("gideon_tree.nwck")
     t.scientific_name = "Bacteria"
@@ -70,8 +73,8 @@ if __name__ == "__main__":
         if args.more_info:
             n.miscl_full = "%s | %i %i %i %i %s | %i %i %i %i %s" % tuple([n.scientific_name] + [round(miscl_phypat_ml.loc[n.name,].iloc[i], 2) for i in range(5)] + [round(miscl_phypat.loc[n.name,].iloc[i], 2) for i in range(5)])
         else:
-            print miscl_phypat_ml.columns
-            n.miscl_full = "%s| %s%% | %s%%" % (n.scientific_name , round(miscl_phypat_ml.loc[n.name,'0'], 3) * 100,  round(miscl_phypat.loc[n.name,'0'], 3) * 100)
+            #n.miscl_full = "%s| %s%% | %s%%" % (n.scientific_name , round(miscl_phypat_ml.loc[n.name,'0'], 3) * 100,  round(miscl_phypat.loc[n.name,'0'], 3) * 100)
+            n.miscl_full = "%s" % n.scientific_name
 
     ts = TreeStyle()
     #ts.rotation = 90
@@ -80,18 +83,21 @@ if __name__ == "__main__":
     ts.show_leaf_name = False
     #don't show scale (unit branch lengths)
     ts.show_scale = False
-    ts.title.add_face(CircleFace( radius = 10, style="sphere", color = map_bacc2color(0.8, 0.8, 1.0)), column=0)
-    ts.title.add_face(TextFace("80%"), column = 0)
-    ts.title.add_face(CircleFace( radius = 10, style="sphere", color = map_bacc2color(0.85, 0.8,  1)), column=1)
-    ts.title.add_face(TextFace("85%"), column = 1)
-    ts.title.add_face(CircleFace( radius = 10, style="sphere", color = map_bacc2color(0.90,0.8,  1.0)), column=2)
-    ts.title.add_face(TextFace("90%"), column = 2)
-    ts.title.add_face(CircleFace( radius = 10, style="sphere", color = map_bacc2color(0.95,0.8,  1)), column=3)
-    ts.title.add_face(TextFace("95%"), column = 3)
-    ts.title.add_face(CircleFace( radius = 10, style="sphere", color = map_bacc2color(1.0,0.8,  0.99)), column=4)
-    ts.title.add_face(TextFace("100%"), column = 4)
+    ts.title.add_face(TextFace("Accuracy\t"), column = 0)
+    ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(0.75, 0.75, 1.0)), column=1)
+    ts.title.add_face(TextFace("<75%"), column = 1)
+    ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(0.8, 0.75, 1.0)), column=2)
+    ts.title.add_face(TextFace("80%"), column = 2)
+    ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(0.85, 0.75,  1)), column=3)
+    ts.title.add_face(TextFace("85%"), column = 3)
+    ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(0.90, 0.75,  1.0)), column=4)
+    ts.title.add_face(TextFace("90%"), column = 4)
+    ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(0.95, 0.75,  1)), column=5)
+    ts.title.add_face(TextFace("95%"), column = 5)
+    ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(1.0, 0.75,  0.99)), column=6)
+    ts.title.add_face(TextFace("100%"), column = 6)
 
-    t.render(args.out_f, tree_style = ts)    
+    t.render(args.out_f, tree_style = ts, dpi = 300)    
 
 
 

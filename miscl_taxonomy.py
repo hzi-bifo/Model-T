@@ -23,12 +23,16 @@ def map_miscl2taxonomy(miscl_m_dir, out_dir):
     #read in the matrix of misclassified species statistics
     miscl_m = ps.read_csv("%s/misclassified_overall.tsv"%miscl_m_dir, sep = "\t", index_col = 0) 
     miscl_m.index = [str(i) for i in miscl_m.index]
-    keys = ["FN", "FP", "NEG", "POS", "overall"]
+    keys = ["FN", "FP", "NEG", "POS",  "overall"]
     ncbi_tree = ete2.Tree("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gideon_tree.nwck")
     per_pt_dict = dict((i, ps.read_csv("%s/misclassified_per-pt_%s.tsv"%(miscl_m_dir, i), sep = "\t", index_col = 0)) for i in ["FN", "FP", "NEG", "POS"])
     for i in per_pt_dict:
         per_pt_dict[i].index = [str(j) for j in per_pt_dict[i].index]
     per_pt_dict["overall"] = miscl_m
+    gc = ps.Series(ps.np.ones(shape = (per_pt_dict["overall"].shape[0])), name = "gc")
+    gc.index = per_pt_dict["overall"].index
+    per_pt_dict["overall"]  = ps.concat([per_pt_dict["overall"], gc], axis = 1)
+
     per_pt_extd_dict = {}
     for i in per_pt_dict:
         per_pt_extd_dict[i] = ps.DataFrame(ps.np.zeros(shape = (len([j for j in ncbi_tree.traverse()]), len(per_pt_dict[i].columns))))
