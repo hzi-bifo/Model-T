@@ -123,16 +123,16 @@ class pt_classification:
             y_join = y.copy()
             if is_phypat_and_rec:
                 y_join =  y_join.append(y_p)
-            if len(y_join) < self.config['min_samples']:
-                print "skipping pt %s with only %s observations"%(pt_out,len(y_join))
+            if len(y_p) < self.config['min_samples']:
+                print "skipping pt %s with only %s observations"%(pt_out,len(y_p))
                 continue
-            if sum(y_join > 0) < self.config['min_pos']:
-                print "skipping pt %s with only %s + observations"%(pt_out,sum(y_join>0))
+            if sum(y_p > 0) < self.config['min_pos']:
+                print "skipping pt %s with only %s + observations"%(pt_out,sum(y_p>0))
                 continue
-            if sum(y_join==-1) < self.config['min_neg']:
-                print "skipping pt %s with only %s - observations"%(pt_out,sum(y_join==-1))
+            if sum(y_p <=0) < self.config['min_neg']:
+                print "skipping pt %s with only %s - observations"%(pt_out,sum(y_p<=0))
                 continue
-            print "pt_out", pt, "with", sum(y_join>0), "positive samples and", sum(y_join==-1), "negative samples"
+            print "pt_out", pt, "with", sum(y_p>0), "positive samples and", sum(y_p<=0), "negative samples"
             if not cv_inner is None:
                 try:
                     all_preds = ps.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
