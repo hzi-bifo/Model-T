@@ -210,7 +210,6 @@ class nested_cv:
             x_train_sub = x_train.loc[sample_samples, sample_feats].copy()
             y_train_t_sub = y_train_t.loc[sample_samples]
             yp_train_t_sub = yp_train_t.loc[sample_samples_p]
-            w_sub = w.loc[sample_samples]
             #print y_train_t_sub, yp_train_t_sub, w_sub
     
             if self.is_phypat_and_rec:
@@ -228,7 +227,6 @@ class nested_cv:
                 #w = w[index_vector]
                 #END EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
                 xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
-                sample_weight = ps.concat([w_sub, ps.Series(np.ones(shape = len(yp_train_t_sub)))])
                 #EXPERIMENTAL BALANCE WEIGHTS
                 #sample_weight = ps.concat([balance_weights(w, y_train_t), balance_weights(ps.Series(np.ones(len(yp_train_t))), yp_train_t)])
                 #print sample_weight.sum(), "sample weights total"
@@ -240,14 +238,14 @@ class nested_cv:
                 if self.do_normalization:
                     X, scaler = self.normalize(X)
                 y = ps.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
-                predictor.fit(X = X, y = y, sample_weight = sample_weight)
+                predictor.fit(X = X, y = y)
             else: 
                 if self.inverse_feats:
                     #add inverse features
                     x_train_sub = ps.concat([x_train_sub, 1 - x_train_sub], axis = 1) 
                 if self.do_normalization:
                     x_train_sub, scaler = self.normalize(x_train_sub)
-                predictor.fit(x_train_sub, y_train_t_sub, sample_weight = w_sub)
+                predictor.fit(x_train_sub, y_train_t_sub)
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
                 #add inverse features to test sample
@@ -508,7 +506,6 @@ class nested_cv:
             for l in range(no_classifier):
                 x_sub = x.loc[sample_samples, sample_feats]
                 y_t_sub = y_t.loc[sample_samples]
-                w_sub = w.loc[sample_samples]
                 if self.is_phypat_and_rec:
                     x_p_sub = x_p.loc[sample_samples_p, sample_feats]
                     y_p_t_sub = y_p_t.loc[sample_samples_p]
@@ -520,7 +517,7 @@ class nested_cv:
                     if self.do_normalization:
                         X, _ = self.normalize(X)
                     #predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([balance_weights(w, y_t), balance_weights(ps.Series(np.ones(shape = len(y_p))), y_p_t)]))
-                    predictor.fit(X, ps.concat([y_t_sub, y_p_t_sub], axis = 0), sample_weight = ps.concat([w_sub, ps.Series(np.ones(shape = len(y_p_t_sub)))]))
+                    predictor.fit(X, ps.concat([y_t_sub, y_p_t_sub], axis = 0))
                 else:
                     if self.inverse_feats:
                         #add inverse features
@@ -528,7 +525,7 @@ class nested_cv:
                     #normalize if the corresponding option is set
                     if self.do_normalization:
                         x_sub, _ = self.normalize(x_sub)
-                    predictor.fit(x_sub, y_t_sub, sample_weight = w_sub)
+                    predictor.fit(x_sub, y_t_sub)
                     #save the model
                 #add inverse features if the corresponding option is set
                 if self.inverse_feats:

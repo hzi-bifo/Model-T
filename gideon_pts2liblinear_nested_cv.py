@@ -36,7 +36,7 @@ class pt_classification:
     
 
     
-    def __init__(self, config_f, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, parsimony_params, is_phypat_and_rec,  cv_outer=10, cv_inner=None, n_jobs = 1, perc_samples = 1.0, perc_feats = 1.0, inverse_feats = False, do_normalization = False, resume = False):
+    def __init__(self, config_f, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_normalization, resume, parsimony_params = None ):
         """main routine to prepare data for classification and feature selection"""
         self.model_out = model_out
         self.resume = resume
@@ -183,91 +183,37 @@ class pt_classification:
             self.ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, self.config['k'], pt_out)
         f.close()
 if __name__=="__main__":
-    #only testing
-    if len(sys.argv) == 1:
-        print """USAGE: python %s
--y <data_f> phyletic patterns, i.e. one matrix with all the phenotypes 
--d <input dir> with one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes 
--l <threshold:x,mode:<gain, loss, gain_loss>> only use if in reconstruction classification i.e. option -d is set as well, in that case -l means that we have parsimony reconstruction, this is followed by the options for the likelihood-based reconstruction e.g. -l threshold:0.5,mode:gain 
--a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
--b only use if in reconstruction classification i.e. option -d is set as well, in that case -b means that training is done on both the phyletic patterns and the parsimony / likelihood reconstruction 
--v <inner cross validation folds> the number of folds used for inner cross validation  
--i <inner cross validation folds> the number of folds used for inner cross validation if this option is given nested cross validation will be performed otherwise only feature selection routines will launched  
--o <out dir> for the models, selected features etc. 
--c <use counts> use raw data with normalization and don't binarize 
--j <number of jobs> that shall be used
--g <range of genotypes> e.g. 1-8400
--p <range of phenotypes> to consider e.g 8550-8560
--r <percentage of features> to to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included
--c <inverse feats> if option set, extend the feature space in the classification by the inverse features (1-X) to get rid of noise features
--h if set the program tries to resume the classification / feature selection i.e. the output directory already exists
-        """ % (sys.argv[0])
-        sys.exit(2)
-    try:
-        optlist, args = getopt.getopt(sys.argv[1:], "f:d:y:l:a:bv:i:cj:g:p:o:s:r:eh")
-    except getopt.GetoptError as err:
-        # print help information and exit:
-        print str(err)  # will print something like "option -a not recognized"
-        sys.exit(2)
-    phypat_f = None
-    rec_dir = None
-    likelihood_params = None
-    parsimony_params = None
-    is_phypat_and_rec = False
-    out = None
-    cv_outer = None
-    cv_inner = None
-    do_normalization = False 
-    g1 = g2 = None
-    pt1 = pt2 = None
-    n_jobs = 1 
-    perc_samples = 1.0
-    perc_feats = 1.0
-    inverse_feats = False 
-    resume = False
-    config_f = "/net/metagenomics/projects/phenotypes_20130523/code/learning/config.json"
+    import argparse
+    parser = argparse.ArgumentParser("combine the misclassified samples of different phenotypes into data matrices")
+    parser.add_argument("phypat_f", help='phyletic patterns, i.e. one matrix with all the phenotypes')
+    parser.add_argument("cv_outer", type = int, help = 'the number of folds used for outer cross validation' ) 
+    parser.add_argument("out",  help = 'for the models, selected features etc.') 
+    parser.add_argument("gt_range", help = "range of genotypes> e.g. 1-8400; has to start with 1")
+    parser.add_argument("pt_range", help = "range of phenotypes> to consider e.g 8550-8560")
+    parser.add_argument("-config_f", help = "location of the config file", default = "/net/metagenomics/projects/phenotypes_20130523/code/learning/config.json")
 
-    for o, a in optlist:
-        if o == "-f":
-            config_f = a
-        if o == "-d":
-            rec_dir = a
-        if o == "-y":
-            phypat_f = a
-        if o == "-l":
-            #parse likelihood option
-            likelihood_params =  dict(i.split(":") for i in a.strip().split(","))
-        if o == "-a":
-            #parse likelihood option
-            parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
-        if o == "-b":
-            is_phypat_and_rec = True
-        if o == "-v":
-            cv_outer = int(a)
-        if o == "-i":
-            cv_inner = int(a)
-        if o == "-c":
-            do_normalization = True 
-        if o == "-j":
-            n_jobs = int(a)
-        if o == "-g":
-            g1, g2 = [int(i) for i in a.split("-")]
-        if o == "-p":
-            pt1, pt2 = [int(i) for i in a.split("-")]
-        if o == "-o":
-            out = a 
-        if o == "-s":
-            perc_samples = float(a)
-        if o == "-r":
-            perc_feats = float(a)
-        if o == "-e":
-            inverse_feats = True
-        if o == "-h":
-            resume = True
-    print config_f
-    if os.path.exists(out) and not resume:
+    parser.add_argument("--rec_dir", default = None, help='one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes')
+    parser.add_argument("--likelihood_params", default = None, help='<threshold:x,mode:<gain, loss, gain_loss>> only use if in reconstruction classification i.e. option -d is set as well')
+    parser.add_argument("--is_phypat_and_rec", action = "store_true", help='only use if in reconstruction classification i.e. option likelihood_params is set as well; training will be done on the gains and losses and the phyletic patterns')
+    parser.add_argument("--do_normalization",  action = "store_true", help = "use raw data with normalization and don't binarize")
+    parser.add_argument("--perc_feats", default = 1.0, type = int, help = "percent of features to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included")
+    parser.add_argument("--perc_samples", default = 1.0, type = int, help = "percent of samples to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all samples included")
+    parser.add_argument("--inverse_feats", action = "store_true", help = "if option set, extend the feature space in the classification by the inverse features (1-X) to get rid of noise features")
+    parser.add_argument("--resume", action = "store_true", help = "if set the program tries to resume the classification / feature selection i.e. the output directory already exists")
+    parser.add_argument("--cv_inner", type = int, default = None, help = 'the number of folds used for inner cross validation if this option is given nested cross validation will be performed otherwise only feature selection routines will launched') 
+    parser.add_argument("--n_jobs", type = int, default = 1, help = "number of jobs that shall be used")
+    #-a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
+    #parsimony_params = None
+    #parse likelihood option
+    a = parser.parse_args()
+    if not a.likelihood_params is None:
+        likelihood_params =  dict(i.split(":") for i in a.likelihood_params.strip().split(","))
+    #parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
+    g1, g2 = [int(i) for i in a.gt_range.split("-")]
+    pt1, pt2 = [int(i) for i in a.pt_range.split("-")]
+    if os.path.exists(a.out) and not a.resume:
         sys.stderr.write("output directory %s already exists; delete and rerun\n"%out)
         sys.exit(1)
-    elif not os.path.exists(out):
-        os.mkdir(out)
-    pt_cl = pt_classification(config_f = config_f, phypat_f = phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = rec_dir, likelihood_params = likelihood_params, parsimony_params = parsimony_params, is_phypat_and_rec = is_phypat_and_rec, cv_inner = cv_inner, cv_outer = cv_outer, model_out = out, n_jobs = n_jobs, perc_samples = perc_samples, perc_feats = perc_feats, inverse_feats = inverse_feats, do_normalization = do_normalization, resume = resume) 
+    elif not os.path.exists(a.out):
+        os.mkdir(a.out)
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 
