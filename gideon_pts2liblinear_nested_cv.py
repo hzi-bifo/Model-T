@@ -212,8 +212,8 @@ if __name__=="__main__":
     g1, g2 = [int(i) for i in a.gt_range.split("-")]
     pt1, pt2 = [int(i) for i in a.pt_range.split("-")]
     if os.path.exists(a.out) and not a.resume:
-        sys.stderr.write("output directory %s already exists; delete and rerun\n"%out)
+        sys.stderr.write("output directory %s already exists; delete and rerun\n"%a.out)
         sys.exit(1)
     elif not os.path.exists(a.out):
         os.mkdir(a.out)
-    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = a.rec_dir, likelihood_params = likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 
