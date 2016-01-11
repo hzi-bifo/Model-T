@@ -144,7 +144,6 @@ class build_edge_matrix:
         #both nodes are leave nodes
         elif l.is_leaf() and r.is_leaf():
             if str(self.phy[l.taxon.label][pt]) not in self.missing_characters and str(self.phy[r.taxon.label][pt]) not in self.missing_characters:
-                #print str(self.phy[l.taxon.label][pt])
                 edges.append([l.taxon.label,node.taxon.label])
                 edges.append([r.taxon.label,node.taxon.label])
                 return True
@@ -249,8 +248,8 @@ class build_edge_matrix:
                 #    s+="0\t"
             #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
             if pt > gt_end - 1 and pt in edge2char2val[tuple(e)]:
-                print "this shouldn't happen"
-                sys.exit(0)
+                #print "this shouldn't happen"
+                #sys.exit(0)
                 out_m.loc["_".join(e), pt] = edge2char2val[tuple(e)][pt]
                 #s+="%s\n"%edge2char2val[tuple(e)][pt]
                 #else: s+="0\n"
