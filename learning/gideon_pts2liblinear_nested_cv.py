@@ -190,7 +190,7 @@ if __name__=="__main__":
     parser.add_argument("out",  help = 'for the models, selected features etc.') 
     parser.add_argument("gt_range", help = "range of genotypes> e.g. 1-8400; has to start with 1")
     parser.add_argument("pt_range", help = "range of phenotypes> to consider e.g 8550-8560")
-    parser.add_argument("-config_f", help = "location of the config file", default = "/net/metagenomics/projects/phenotypes_20130523/code/learning/config.json")
+    parser.add_argument("config_f", help = "location of the config file")
 
     parser.add_argument("--rec_dir", default = None, help='one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes')
     parser.add_argument("--likelihood_params", default = None, help='<threshold:x,mode:<gain, loss, gain_loss>> only use if in reconstruction classification i.e. option -d is set as well')

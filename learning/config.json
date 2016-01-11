@@ -5,7 +5,7 @@
     #c parameters used for cv error estimation and majority feature selection
     #"c_params": [0.02, 0.05],
     #number of classifiers used for majority feature selection (should be half of the number of c params for a real majority vote)
-    "k" : 13,
+    "k" : 10,
     #seed used to randomize the samples among other things
     "seed" : 0,
     #minimum number of samples required for a specific phenotypes
@@ -14,23 +14,21 @@
     "min_pos":10,
     #niminum samples required for the phenotype minus class
     "min_neg": 10,
-    #number of processess to use (handle with care)
-    "n_jobs": 1,
     #mapping file from taxonomic id to scientific names of the taxa used
-    "sp2taxid": "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/gideon_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_stol_20130904.sp_uq.taxid.txt",
+    "sp2taxid": "",
     #mapping file of feature ids to pfam family accessions and descriptions
-    "id2pfam2desc" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc_NA.txt",
+    "id2pfam2desc" : "",
     #tree file with no internal names
-    "tree_f" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre",
+    "tree_f" : "tree.newick",
     #tree file with internal names
-    "tree_l_f" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon.tre.internal_nodes_labeled.newick",
+    "tree_l_f" : "tree.newick",
     #exectutable of the gainLoss program required for maximum likelihood reconstructions
-    "gainLoss" : "~/software/GLOOME/gainLoss.VR01.266.dRep",
+    "gainLoss" : "gainLoss.VR01.266.dRep",
     #reference directory with precomputed folds from another run of the feature selection / classification pipeline
-    "gainLoss_ref" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/likelihood/ll_gain_loss_threshold0.1_percfeat1.0_shuffled_testref/",
+    #"gainLoss_ref" : "",
     #binary phyletic patterns
-    "phym_f" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfams_pts_bin.tsv",
+    "phym_f" : "",
     #list of taxa ids
-    "phyn_f" : "/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/stol_2_bioprojects_20140115_RefSeq_genome_NCBI20140115_gideon_sp+st.taxid_only.txt"
+    "phyn_f" : ""
 }
 
