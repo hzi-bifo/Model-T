@@ -184,7 +184,7 @@ class pt_classification:
         f.close()
 if __name__=="__main__":
     import argparse
-    parser = argparse.ArgumentParser("combine the misclassified samples of different phenotypes into data matrices")
+    parser = argparse.ArgumentParser("traitar-model the phenotype classifier")
     parser.add_argument("phypat_f", help='phyletic patterns, i.e. one matrix with all the phenotypes')
     parser.add_argument("cv_outer", type = int, help = 'the number of folds used for outer cross validation' ) 
     parser.add_argument("out",  help = 'for the models, selected features etc.') 
@@ -207,7 +207,7 @@ if __name__=="__main__":
     #parse likelihood option
     a = parser.parse_args()
     if not a.likelihood_params is None:
-        likelihood_params =  dict(i.split(":") for i in a.likelihood_params.strip().split(","))
+        a.likelihood_params =  dict(i.split(":") for i in a.likelihood_params.strip().split(","))
     #parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
     g1, g2 = [int(i) for i in a.gt_range.split("-")]
     pt1, pt2 = [int(i) for i in a.pt_range.split("-")]
@@ -216,4 +216,4 @@ if __name__=="__main__":
         sys.exit(1)
     elif not os.path.exists(a.out):
         os.mkdir(a.out)
-    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = a.rec_dir, likelihood_params = likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 

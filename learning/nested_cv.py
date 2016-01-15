@@ -416,7 +416,7 @@ class nested_cv:
                 all_preds.index = yp_train.index
                 #do inner cross validation
                 preds = []
-                for pred in Parallel(n_jobs=self.config['n_jobs'])(delayed(self.cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, self.config['c_params'][j])
+                for pred in Parallel(n_jobs=self.n_jobs)(delayed(self.cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, self.config['c_params'][j])
                         for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
                             in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(self.config['c_params'])))):
                     preds.append(list(pred))
@@ -445,7 +445,7 @@ class nested_cv:
         #TODO account for the case when folds exceeds number of samples
         for j in range(len(self.config['c_params'])):
             preds = []
-            for pred in Parallel(n_jobs= self.config['n_jobs'])(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
+            for pred in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
                     for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
                 preds += list(pred)
             all_preds[:,j] = preds
