@@ -4,12 +4,7 @@ import named_narray as na
 import os
 #import faulthandler
 #faulthandler.enable()
-try:
-    import dendropy as dp
-except ImportError:
-    sys.stderr.write(
-                        "Scripts needs dendropy; run importpackage dendropy before execution\n")
-    sys.exit(1)
+import dendropy as dp
 
 
 class build_edge_matrix_likelihood(bem.build_edge_matrix):
