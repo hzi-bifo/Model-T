@@ -1,6 +1,6 @@
 speciesFile = "bergeys_data/datasetSpeciesRefSeq.txt"
 gemd = "bergeys_data/genome_metadata"
-out = "bergeys_data/map.txt"
+out = "bergeys_data/map_v2.txt"
 
 #refseqs = {}
 refseqs = []
@@ -20,7 +20,7 @@ refseqs = set(refseqs)
 with open(gemd) as file:
     for line in file:
         tmp = line.split("\t")
-        id2faa[tmp[3]] = [tmp[0], tmp[1]]
+        id2faa[tmp[3]] = [tmp[0], tmp[1], tmp[19]]
 
 mis = 0
 with open(out, "w") as file:
@@ -41,7 +41,10 @@ with open(out, "w") as file:
              #   mis += 1
         try:
             tmp = id2faa[sp]
-            file.write(tmp[0] + ".RefSeq.faa\t" + tmp[1] + "\n")
+            if tmp[2] != "-": 
+                file.write(tmp[0] + ".RefSeq.faa\t" + sp + "\n")
+            else:
+                file.write(tmp[0] + ".PATRIC.faa\t" + sp + "\n")
         except KeyError:
             mis += 1
 
