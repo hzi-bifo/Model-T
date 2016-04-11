@@ -20,7 +20,7 @@ class pt_classification:
         for i in range(len(ls)):
             elems = ls[i].strip().split("\t")
             if type(elems[1]) != type(3):
-                id2sp[elems[1]] = elems[0]
+                id2sp[int(elems[1])] = elems[0]
             else:
                 id2sp[int(elems[1])] = elems[0]
         for i in range(miscl_plus.shape[0]):
@@ -36,7 +36,7 @@ class pt_classification:
     
 
     
-    def __init__(self, config_f, model_out, gt_start, gt_end, pt_start, pt_end, phypat_f, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_normalization, resume, parsimony_params = None ):
+    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_normalization, resume, parsimony_params = None ):
         """main routine to prepare data for classification and feature selection"""
         self.model_out = model_out
         self.resume = resume
@@ -54,15 +54,14 @@ class pt_classification:
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
-        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume)
+        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f)
         if not os.path.exists(model_out):
             os.mkdir(model_out)
         #write config to disk
         with open("%s/config.json" % self.model_out, 'w') as out_f:
             json.dump(self.config, out_f, indent=4, separators=(',', ': '))
         #read in phyletic patterns
-        print phypat_f
-        p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0, header = None)
+        p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0)
         #check if this is a new run or if the current run shall be recomputed
         if self.resume:
             f = open("%s/cv_acc.txt"%self.model_out, "a")
@@ -72,10 +71,12 @@ class pt_classification:
         if not os.path.exists("%s/pickled"%self.model_out):
             os.mkdir("%s/pickled"%self.model_out)
         #iterate over all phenotypes
-        for pt in range(pt_start, pt_end+1):
+        pf_mapping = ps.read_csv(pf2acc_desc_f, index_col = 0, sep = "\t") 
+        pt_mapping = ps.read_csv(pt2acc_f, index_col = 0, sep = "\t")
+        for pt in pt_mapping.index:
             pt_out = pt
-            x_p = p[p.iloc[:,pt].notnull()].iloc[:, gt_start:gt_end+1]
-            y_p = p[p.iloc[:,pt].notnull()].iloc[:, pt]
+            x_p = p.loc[p.loc[:,pt].notnull()].loc[:, pf_mapping.index]
+            y_p = p.loc[p.loc[:,pt].notnull()].loc[:, pt_mapping.index].iloc[:, 0]
             #shuffle phyletic pattern samples to avoid biases in the cross validation
             rows = x_p.index.values.copy()
             random.shuffle(rows)
@@ -95,10 +96,9 @@ class pt_classification:
                 #TODO change to panda dataframe to keep the row names
                 a = a.iloc[:,0:(a.shape[1])]
                 #phenotype index in the reconstruction matrix
-                print pt
                 pt = a.shape[1] - 1 
-                x = a.iloc[:, gt_start:gt_end+1]
-                y = a.iloc[:, pt]
+                x = a.iloc[:, pf_mapping.index]
+                y = a.iloc[:, pt_mapping.index]
             else:
                 #we are in pure phyletic pattern mode
                 x = x_p
@@ -188,8 +188,8 @@ if __name__=="__main__":
     parser.add_argument("phypat_f", help='phyletic patterns, i.e. one matrix with all the phenotypes')
     parser.add_argument("cv_outer", type = int, help = 'the number of folds used for outer cross validation' ) 
     parser.add_argument("out",  help = 'for the models, selected features etc.') 
-    parser.add_argument("gt_range", help = "range of genotypes> e.g. 1-8400; has to start with 1")
-    parser.add_argument("pt_range", help = "range of phenotypes> to consider e.g 8550-8560")
+    parser.add_argument("pf2acc_desc_f", help = "pfam mapping file")
+    parser.add_argument("pt2acc_f", help = "phenotype mapping file")
     parser.add_argument("config_f", help = "location of the config file")
 
     parser.add_argument("--rec_dir", default = None, help='one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes')
@@ -209,11 +209,9 @@ if __name__=="__main__":
     if not a.likelihood_params is None:
         a.likelihood_params =  dict(i.split(":") for i in a.likelihood_params.strip().split(","))
     #parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
-    g1, g2 = [int(i) for i in a.gt_range.split("-")]
-    pt1, pt2 = [int(i) for i in a.pt_range.split("-")]
     if os.path.exists(a.out) and not a.resume:
         sys.stderr.write("output directory %s already exists; delete and rerun\n"%a.out)
         sys.exit(1)
     elif not os.path.exists(a.out):
         os.mkdir(a.out)
-    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f, gt_start = g1, gt_end = g2, pt_start = pt1, pt_end = pt2, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume) 

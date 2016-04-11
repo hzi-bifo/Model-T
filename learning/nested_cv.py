@@ -54,7 +54,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume):
+    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -68,6 +68,7 @@ class nested_cv:
         self.model_out = model_out
         self.cv_outer = cv_outer
         self.resume = resume
+        self.pf2desc_f = pf2desc_f
 
     def transf_from_probs(self, x, y):
         """create a series of sample specific weights according to the probabilities"""
@@ -103,15 +104,6 @@ class nested_cv:
     
     def get_pfam_names_and_descs(self, feats):
         """map features to their pfam names and descriptions via a mapping file"""
-        pfam_f = open(self.config['id2pfam2desc'], "r")
-        id2pf = {}
-        ls = pfam_f.readlines()
-        for i in range(len(ls)):
-            elems = ls[i].strip().split("\t")
-            #mapping counts from 1 
-            id2pf[int(elems[0]) - 1] = (elems[1],elems[2])
-        pfam_f.close()
-        return id2pf
     
     @staticmethod 
     def confusion_m(y,y_pred):
@@ -482,7 +474,8 @@ class nested_cv:
         #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
             no_classifier = 1
-        models = np.zeros(shape=(x.shape[1], k * no_classifier))
+        models = ps.DataFrame(np.zeros(shape=(x.shape[1], k * no_classifier)))
+        models.index = x.columns
         #EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
         #index_vector = (y_t != -1) | (w != 1)
         #print y_t
@@ -495,6 +488,7 @@ class nested_cv:
         #y_t = y_t[index_vector]
         #w = w[index_vector]
         #END EXPERIMENTAL
+        bias_cparams = []
         for i in range(k):
             predictor = svm.LinearSVC(C=baccs_s[i][3])
             predictor.set_params(**self.config["liblinear_params"])
@@ -540,12 +534,14 @@ class nested_cv:
                 else:
                     rel_weights = predictor.coef_
                 predictors.append(predictor)
-                models[[np.array(sample_feats) - 1], i * no_classifier + l] = rel_weights 
+                models.loc[sample_feats, i * no_classifier + l] = rel_weights 
+            bias_cparams.append((predictor.C, predictor.intercept_[0]))
+        ps.DataFrame(bias_cparams).to_csv("%s/%s_bias.txt"%(self.model_out,pt_out), sep = "\t", index = None, header = None)
         feats = []
         #determine the majority features 
         for i in range(models.shape[0]):
-            if sum(models[i,:] > 0) >= math.ceil(k/2.0):
-                feats.append(i)
+            if sum(models.loc[models.index[i],:] > 0) >= math.ceil(k/2.0):
+                feats.append(models.index[i])
         rownames = [baccs_s[i][3] for i in range(k)] 
         colnames = ['bacc', "pos_rec", "neg_rec"]
         baccs_s_np = np.array(baccs_s)[0:k,0:3].T
@@ -559,17 +555,12 @@ class nested_cv:
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #write majority features with their weights to disk
-        #print feats
-        id2pf = ps.DataFrame(self.get_pfam_names_and_descs(feats))
-        print id2pf
-        feat_df = ps.concat([id2pf.loc[:, feats], models_df.T.loc[:, feats]], axis = 0).T
-        feat_df.columns = ["Pfam_acc", "Pfam_desc"] + rownames_extd
-        columns_out = ["Pfam_acc"] + rownames_extd + ["Pfam_desc"]
+        pf2desc = ps.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
+        feat_df = ps.concat([pf2desc.loc[feats, ], models_df.loc[feats, ]], axis = 1)
+        feat_df.columns = ["description"] + rownames_extd
+        columns_out = rownames_extd + ["description"]
         feat_df.to_csv("%s/%s_majority_features+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
-        id2pf.index = ("Pfam_acc", "Pfam_desc")
-        id2pf.loc[:, feats].T.to_csv("%s/%s_majority_features.txt"%(self.model_out,pt_out), float_format='%.3f',  sep = "\t")
-        #write coefficient matrix to disk
         #put column names
         #pickle the predictors
-        dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
+        #dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
     
