@@ -76,7 +76,7 @@ class pt_classification:
         for pt in pt_mapping.index:
             pt_out = pt
             x_p = p.loc[p.loc[:,pt].notnull()].loc[:, pf_mapping.index]
-            y_p = p.loc[p.loc[:,pt].notnull()].loc[:, pt_mapping.index].iloc[:, 0]
+            y_p = p.loc[p.loc[:,pt].notnull()].loc[:, pt]
             #shuffle phyletic pattern samples to avoid biases in the cross validation
             rows = x_p.index.values.copy()
             random.shuffle(rows)

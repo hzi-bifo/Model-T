@@ -554,12 +554,15 @@ class nested_cv:
         for i in range(k):
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
+        #get correlation with phenotype for all selected features
+        import scipy.stats
+        cor = x_p.loc[:, feats].apply(lambda x: scipy.stats.pearsonr(x, y_p)[0])
         #write majority features with their weights to disk
         pf2desc = ps.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
-        feat_df = ps.concat([pf2desc.loc[feats, ], models_df.loc[feats, ]], axis = 1)
-        feat_df.columns = ["description"] + rownames_extd
-        columns_out = rownames_extd + ["description"]
-        feat_df.to_csv("%s/%s_majority_features+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+        feat_df = ps.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], cor], axis = 1)
+        feat_df.columns = ["description"] + rownames_extd + ["cor"]
+        columns_out = rownames_extd + ["description"] + ["cor"]
+        feat_df.sort(columns = ["cor"], ascending = False).to_csv("%s/%s_majority_features+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
         #put column names
         #pickle the predictors
         #dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
