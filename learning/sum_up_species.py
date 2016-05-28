@@ -7,10 +7,13 @@ def run(args):
     df ["Refseq IDs"] = df["Unnamed: 0"]
     df = df.set_index('Unnamed: 0')
     df.index = df.index.values.astype('string')
+
     # create dictionary mapping refseq to species IDs
     ref2sp = create_ref2sp_dict(args.mapping_file)
+    print ref2sp
     # map refseq ids to sp ids
     df = map_ref2sp(ref2sp, df)
+    print df
     # call method
     if args.method == "UN":
         df = calculate_union(df)
@@ -18,6 +21,8 @@ def run(args):
         df = calculate_majority(df)
     # replace ids again
     #df = df.set_index("Refseq IDs")
+    # replace RefSeq ID column
+    del df["Refseq IDs"]
     # write to output file
     df.loc[list(set(ref2sp.values())), :].to_csv(args.output, sep="\t")
 
