@@ -6,6 +6,7 @@ def run(args):
     df = pd.read_csv(args.input_file, sep="\t")
     df ["Refseq IDs"] = df["Unnamed: 0"]
     df = df.set_index('Unnamed: 0')
+    df.index = df.index.values.astype('string')
     # create dictionary mapping refseq to species IDs
     ref2sp = create_ref2sp_dict(args.mapping_file)
     # map refseq ids to sp ids
@@ -16,9 +17,9 @@ def run(args):
     else:
         df = calculate_majority(df)
     # replace ids again
-    df = df.set_index("Refseq IDs")
+    #df = df.set_index("Refseq IDs")
     # write to output file
-    df.to_csv(args.output, sep="\t")
+    df.loc[list(set(ref2sp.values())), :].to_csv(args.output, sep="\t")
 
 def create_ref2sp_dict(map):
     ref2sp = {}
