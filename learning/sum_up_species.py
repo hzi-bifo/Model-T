@@ -10,19 +10,21 @@ def run(args):
 
     # create dictionary mapping refseq to species IDs
     ref2sp = create_ref2sp_dict(args.mapping_file)
-    print ref2sp
     # map refseq ids to sp ids
     df = map_ref2sp(ref2sp, df)
-    print df
+    del df["Refseq IDs"]
     # call method
+
     if args.method == "UN":
         df = calculate_union(df)
-    else:
+    elif args.method == "MV":
         df = calculate_majority(df)
+    else:
+        df = calculate_intersection(df)
     # replace ids again
     #df = df.set_index("Refseq IDs")
     # replace RefSeq ID column
-    del df["Refseq IDs"]
+
     # write to output file
     df.loc[list(set(ref2sp.values())), :].to_csv(args.output, sep="\t")
 
@@ -57,8 +59,19 @@ def calculate_union(df):
     return df
 
 def calculate_majority(df):
-    df = df.groupby(df.index)
-    df = df.max()
+    #df = df.groupby(df.index)
+    #df = df.max()
+    # turn it binary
+    df = df.apply(lambda x:x > 0)
+    df = df.groupby(df.index).mean()
+    df = df.applymap(lambda x:1 if x >= 0.5 else 0)
+    return df
+
+def calculate_intersection(df):
+    # turn it binary
+    df = df.apply(lambda x:x > 0)
+    df = df.groupby(df.index).mean()
+    df = df.applymap(lambda x:1 if x == 1 else 0)
     return df
 
 if __name__ == "__main__":
@@ -67,7 +80,7 @@ if __name__ == "__main__":
     parser.add_argument('mapping_file', help='mapping file name that maps refseq IDs to species IDs')
     parser.add_argument('-o', '--output', default= 'corrected_df.txt',
                        help='choose putput file name. Default: corrected_df.txt')
-    parser.add_argument('-m', '--method', default= 'UN', choices=['UN', 'MV'],
-                       help='choose method to unite results. Union or Majority Vote')
+    parser.add_argument('-m', '--method', default= 'UN', choices=['UN', 'MV', 'IS'],
+                       help='choose method to unite results. Union, Intersection or Majority Vote')
     args = parser.parse_args()
     run(args)
