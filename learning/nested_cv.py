@@ -11,11 +11,11 @@ from joblib import Parallel, delayed, load, dump
 from operator import itemgetter
 import math
 import random
-random.seed(1)
+#random.seed(1)
 #initialize with seed
 #TODO put this into a class and use random state from gideon script
-random_nested_cv = random.Random()
-random_nested_cv.seed(1)
+#random_nested_cv = random.Random()
+#random_nested_cv.seed(1)
 import cv_rec_helper as crh 
 import sys
 import itertools
@@ -54,7 +54,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f):
+    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, discard_in_recon):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -69,6 +69,7 @@ class nested_cv:
         self.cv_outer = cv_outer
         self.resume = resume
         self.pf2desc_f = pf2desc_f
+        self.discard_in_recon = discard_in_recon
 
     def transf_from_probs(self, x, y):
         """create a series of sample specific weights according to the probabilities"""
@@ -196,8 +197,8 @@ class nested_cv:
             #select a subset of features for classification
             sample_feats = sorted(random.sample(x_train.columns, int(math.floor(x_train.shape[1] * self.perc_feats))))
             #select a subset of samples for classification
-            sample_samples = sorted(random_nested_cv.sample(x_train.index, int(math.floor(x_train.shape[0] * self.perc_samples))))
-            sample_samples_p = sorted(random_nested_cv.sample(xp_train.index, int(math.floor(xp_train.shape[0] * self.perc_samples))))
+            sample_samples = sorted(random.sample(x_train.index, int(math.floor(x_train.shape[0] * self.perc_samples))))
+            sample_samples_p = sorted(random.sample(xp_train.index, int(math.floor(xp_train.shape[0] * self.perc_samples))))
             #reduce feature space to the selected features
             x_train_sub = x_train.loc[sample_samples, sample_feats].copy()
             y_train_t_sub = y_train_t.loc[sample_samples]
@@ -304,7 +305,7 @@ class nested_cv:
         if not self.parsimony_params is None:
             m = crh.reconstruct_pt_parsimony(yp_train, self.model_out, self.config, self.parsimony_params)
         else:
-            m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold)
+            m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold, self.discard_in_recon)
         all_pt_edges = set(x_r.index)
         train_pt_edges = set(m.index)
         #print len(all_pt_edges), "anzahl aller reconstruction samples"
@@ -494,8 +495,8 @@ class nested_cv:
             predictor.set_params(**self.config["liblinear_params"])
             #sample A features and B samples if the corresponding options are set
             sample_feats = sorted(random.sample(x.columns, int(math.floor(x.shape[1] * self.perc_feats))))
-            sample_samples_p = sorted(random_nested_cv.sample(x_p.index, int(math.floor(x_p.shape[0] * self.perc_samples))))
-            sample_samples = sorted(random_nested_cv.sample(x.index, int(math.floor(x.shape[0] * self.perc_samples))))
+            sample_samples_p = sorted(random.sample(x_p.index, int(math.floor(x_p.shape[0] * self.perc_samples))))
+            sample_samples = sorted(random.sample(x.index, int(math.floor(x.shape[0] * self.perc_samples))))
             #train the full model with the k best models
             for l in range(no_classifier):
                 x_sub = x.loc[sample_samples, sample_feats]
@@ -540,7 +541,8 @@ class nested_cv:
         feats = []
         #determine the majority features 
         for i in range(models.shape[0]):
-            if sum(models.loc[models.index[i],:] > 0) >= math.ceil(k/2.0):
+            #if sum(models.loc[models.index[i],:] != 0) >= math.ceil(k/2.0):
+            if sum(models.loc[models.index[i],:] != 0) > 1:
                 feats.append(models.index[i])
         rownames = [baccs_s[i][3] for i in range(k)] 
         colnames = ['bacc', "pos_rec", "neg_rec"]
@@ -555,14 +557,15 @@ class nested_cv:
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #get correlation with phenotype for all selected features
-        import scipy.stats
-        cor = x_p.loc[:, feats].apply(lambda x: scipy.stats.pearsonr(x, y_p)[0])
-        #write majority features with their weights to disk
-        pf2desc = ps.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
-        feat_df = ps.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], cor], axis = 1)
-        feat_df.columns = ["description"] + rownames_extd + ["cor"]
-        columns_out = rownames_extd + ["description"] + ["cor"]
-        feat_df.sort(columns = ["cor"], ascending = False).to_csv("%s/%s_majority_features+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+        if not len(feats) == 0:
+            import scipy.stats
+            cor = x_p.loc[:, feats].apply(lambda x: scipy.stats.pearsonr(x, y_p)[0])
+            #write majority features with their weights to disk
+            pf2desc = ps.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
+            feat_df = ps.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], cor], axis = 1)
+            feat_df.columns = ["description"] + rownames_extd + ["cor"]
+            columns_out = rownames_extd + ["description"] + ["cor"]
+            feat_df.sort(columns = ["cor"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
         #put column names
         #pickle the predictors
         #dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
