@@ -1,10 +1,10 @@
 import pandas as ps
 import sys
 import get_cor_feats
-
 def feat_sel(weights_f, id2pf2desc_f, k = 5, strategy = "majority", include_negative_class = False, pt_correlation = False, phypat_f = None, target = None):
     w = ps.read_csv(weights_f, sep = "\t", index_col = 0)
-    id2pf2desc = ps.read_csv(id2pf2desc_f, sep = "\t", index_col = 0, header = None)
+    id2pf2desc = ps.read_csv(id2pf2desc_f, sep = "\t", index_col = 1, header = None)
+    id2pf2desc.sort(columns = 0, inplace = True)
     if strategy == "majority": 
         sel_feats_pos = w.loc[w.apply(lambda x: (x.iloc[0:k][x > 0] > 0).sum() > k/2, axis = 1) ]
         if include_negative_class:
@@ -21,7 +21,6 @@ def feat_sel(weights_f, id2pf2desc_f, k = 5, strategy = "majority", include_nega
         raise IllegalArgumentException
     if not include_negative_class:
         sel_feats = sel_feats_pos
-    id2pf2desc.index = [int(i) - 1 for i in id2pf2desc.index]
     #print id2pf2desc
     sel_feats[['Pfam_acc', 'Pfam_desc']] = id2pf2desc.loc[sel_feats.index,]
     if include_negative_class:
@@ -38,22 +37,21 @@ def feat_sel(weights_f, id2pf2desc_f, k = 5, strategy = "majority", include_nega
     sel_feats = sel_feats[cols]
     if pt_correlation:
         phypat = ps.read_csv(phypat_f, index_col = 0, sep = "\t", header = None)
-        pfams = ps.read_csv(id2pf2desc_f, sep = "\t", header = None)
-        pfams.index = pfams.loc[:, 1]
-        target_id = pfams.loc[target, 0] - 1 
-        phypat_red = phypat.loc[phypat.iloc[:, target_id] != "?",]
+        phypat.columns = id2pf2desc.index.tolist()
+        phypat.columns.values[8476:8569] = range(8476, 8569)
+        phypat_red = phypat.loc[phypat.loc[:, int(target)] != "?",]
         #phypat_red = phypat
-        phypat_red_pt = phypat_red.iloc[:, id2pf2desc.iloc[range(w.shape[0]), :].index.tolist() + [target_id]].astype('int')
-        phypat_red_pt.columns = pfams.iloc[range(w.shape[0]) + [target_id], 1]
+        phypat_red_pt = phypat_red.loc[:,   id2pf2desc.index[:8476].tolist() + [int(target)]].astype('int')
         phypat_red_pt = (phypat_red_pt > 0).astype('int')
-        cor1 = get_cor_feats.get_selected_cor(target, sel_feats.iloc[:sel_feats_pos.shape[0], 0], phypat_red_pt, pfams)
-        cor2 = get_cor_feats.get_selected_cor(target, sel_feats.iloc[sel_feats_pos.shape[0]:, 0], phypat_red_pt, pfams)
+        cor1 = get_cor_feats.get_selected_cor(int(target), sel_feats.iloc[:sel_feats_pos.shape[0], 0].index, phypat_red_pt, id2pf2desc)
+        cor2 = get_cor_feats.get_selected_cor(int(target), sel_feats.iloc[sel_feats_pos.shape[0]:, 0].index, phypat_red_pt, id2pf2desc)
         cor = ps.concat([cor1, cor2], axis = 0)
         cor.columns = ["cor", "_"]
-        cor = cor.loc[sel_feats.loc[:, "Pfam_acc"], ].iloc[:, 0]
+        cor = cor.loc[sel_feats.index, ].iloc[:, 0]
         cor.index = sel_feats.index
         sel_feats = ps.concat([sel_feats, cor] , axis = 1)
-        sel_feats = sel_feats.reindex(sel_feats.loc[:, "cor"].abs().order(ascending = False).index)
+        sel_feats = sel_feats.reindex(sel_feats.loc[:, "cor"].order(ascending = False).index)
+        sel_feats.drop("Pfam_acc", axis = 1, inplace = True)
 
     sel_feats.to_csv(sys.stdout, sep = "\t", float_format = '%.3f')
 

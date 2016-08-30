@@ -7,25 +7,28 @@ def run(args):
     df ["Refseq IDs"] = df["Unnamed: 0"]
     df = df.set_index('Unnamed: 0')
     df.index = df.index.values.astype('string')
-
     # create dictionary mapping refseq to species IDs
     ref2sp = create_ref2sp_dict(args.mapping_file)
+
     # map refseq ids to sp ids
     df = map_ref2sp(ref2sp, df)
     del df["Refseq IDs"]
     # call method
-
-    if args.method == "UN":
+    if args.method == "un":
         df = calculate_union(df)
-    elif args.method == "MV":
+    elif args.method == "mv":
         df = calculate_majority(df)
-    else:
+    elif args.method == "is":
         df = calculate_intersection(df)
+    else: 
+        sys.exit("%s is not a  valid option" % args.method)
     # replace ids again
     #df = df.set_index("Refseq IDs")
     # replace RefSeq ID column
 
     # write to output file
+    for i in ref2sp.values():
+        print i, i in df.index
     df.loc[list(set(ref2sp.values())), :].to_csv(args.output, sep="\t")
 
 def create_ref2sp_dict(map):
@@ -34,6 +37,7 @@ def create_ref2sp_dict(map):
         for line in mapfile:
             tmp = line.split("\t")
             sp = tmp[0]
+            print "new line"
             for el in tmp[1].replace("\n", "").split(","):
                 ref2sp[el.strip()] = sp.strip()
     return ref2sp
@@ -71,6 +75,7 @@ def calculate_intersection(df):
     # turn it binary
     df = df.apply(lambda x:x > 0)
     df = df.groupby(df.index).mean()
+    print df
     df = df.applymap(lambda x:1 if x == 1 else 0)
     return df
 
@@ -80,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument('mapping_file', help='mapping file name that maps refseq IDs to species IDs')
     parser.add_argument('-o', '--output', default= 'corrected_df.txt',
                        help='choose putput file name. Default: corrected_df.txt')
-    parser.add_argument('-m', '--method', default= 'UN', choices=['UN', 'MV', 'IS'],
+    parser.add_argument('-m', '--method', default= 'UN', choices=['un', 'mv', 'is'],
                        help='choose method to unite results. Union, Intersection or Majority Vote')
     args = parser.parse_args()
     run(args)
