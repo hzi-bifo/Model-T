@@ -1,0 +1,39 @@
+{
+    "min_neg": 10,
+    "sp2taxid": "sp2bp.txt",
+    "liblinear_params": {
+        "loss": "l2",
+        "intercept_scaling": 1,
+        "fit_intercept": true,
+        "random_state": 1,
+        "penalty": "l1",
+        "tol": 1e-06,
+        "dual": false,
+        "class_weight": "auto"
+    },
+    "min_pos": 10,
+    "k": 5,
+    "phym_f": "",
+    "id2pfam2desc": "acc2desc_name.txt",
+    "phyn_f": "",
+    "tree_l_f": "tree.newick",
+    "seed": 0,
+    "gainLoss": "gainLoss.VR01.266.dRep",
+    "tree_f": "tree.newick",
+    "c_params": [
+        0.001,
+        0.002,
+        0.005,
+        0.007,
+        0.01,
+        0.02,
+        0.05,
+        0.07,
+        0.1,
+        0.2,
+        0.5,
+        0.7,
+        1
+    ],
+    "min_samples": 20
+}

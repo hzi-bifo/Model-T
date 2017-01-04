@@ -1,0 +1,4 @@
+	accession
+weimann	plant biomass degradation weimann
+konietzny	plant biomass degradation konietz
+extended	plant biomass degradation extd

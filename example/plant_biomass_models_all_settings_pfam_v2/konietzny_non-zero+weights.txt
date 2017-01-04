@@ -1,0 +1,34 @@
+	0.2_0	0.5_0	0.7_0	1_0	0.05_0	description	cor
+PF03422	0.941	1.050	1.090	1.045	0.675	Carbohydrate binding module (family 6)	0.959
+PF02018	0.402	0.396	0.414	0.386	0.387	Carbohydrate binding domain	0.920
+PF00331	0.167	0.177	0.181	0.168	0.012	Glycosyl hydrolase family 10	0.865
+PF01915	0.048	0.079	0.058	0.099	0.000	Glycosyl hydrolase family 3 C-terminal domain	0.795
+PF07561	0.000	0.030	0.045	0.067	0.000	Domain of Unknown Function (DUF1540)	0.613
+PF02614	0.000	0.022	0.042	0.000	0.000	Glucuronate isomerase	0.612
+PF07221	0.022	0.092	0.107	0.149	0.000	N-acylglucosamine 2-epimerase (GlcNAc 2-epimerase)	0.595
+PF02424	0.000	0.000	-0.009	-0.012	0.000	ApbE family	0.127
+PF06144	0.000	0.000	-0.007	-0.060	0.000	DNA polymerase III, delta subunit	0.107
+PF14559	0.000	-0.028	-0.048	0.000	0.000	Tetratricopeptide repeat	0.012
+PF04389	0.000	-0.001	-0.008	-0.023	0.000	Peptidase family M28	-0.066
+PF13230	-0.049	-0.091	-0.108	-0.117	0.000	Glutamine amidotransferases class-II	-0.092
+PF00708	-0.095	-0.095	-0.095	-0.110	0.000	Acylphosphatase	-0.123
+PF01206	0.000	-0.005	-0.002	0.000	0.000	Sulfurtransferase TusA	-0.162
+PF01242	-0.046	-0.053	-0.053	-0.082	0.000	6-pyruvoyl tetrahydropterin synthase	-0.213
+PF01702	-0.374	-0.460	-0.457	-0.404	-0.169	Queuine tRNA-ribosyltransferase	-0.305
+PF03070	0.000	-0.021	-0.020	-0.060	0.000	TENA/THI-4/PQQC family	-0.319
+PF07885	0.000	-0.047	-0.064	0.000	0.000	Ion channel	-0.320
+PF13454	0.000	-0.028	-0.024	0.000	0.000	FAD-NAD(P)-binding	-0.329
+PF13660	0.000	-0.012	-0.021	-0.010	0.000	Domain of unknown function (DUF4147)	-0.361
+PF05161	0.000	-0.003	-0.011	-0.015	0.000	MOFRL family	-0.361
+PF14833	-0.024	-0.006	0.000	0.000	0.000	NAD-binding of NADP-dependent 3-hydroxyisobutyrate dehydrogenase	-0.396
+PF01019	0.000	-0.018	-0.027	-0.053	0.000	Gamma-glutamyltranspeptidase	-0.430
+PF00565	-0.033	-0.024	-0.006	0.000	0.000	Staphylococcal nuclease homologue	-0.435
+PF01523	-0.071	-0.041	-0.027	-0.022	-0.009	Putative modulator of DNA gyrase	-0.446
+PF02594	-0.023	-0.057	-0.071	-0.035	0.000	Uncharacterised ACR, YggU family COG1872	-0.479
+PF02634	-0.169	-0.179	-0.168	-0.238	-0.095	FdhD/NarQ family	-0.525
+PF03641	-0.025	-0.014	0.000	-0.037	0.000	Possible lysine decarboxylase	-0.534
+PF01040	-0.038	-0.021	-0.021	0.000	-0.061	UbiA prenyltransferase family	-0.546
+PF02091	-0.064	-0.065	-0.139	-0.039	-0.155	Glycyl-tRNA synthetase alpha subunit	-0.562
+PF02092	-0.042	-0.061	0.000	-0.055	-0.000	Glycyl-tRNA synthetase beta subunit	-0.562
+PF02416	-0.033	0.000	0.000	0.000	-0.014	mttA/Hcf106 family	-0.582
+PF00420	-0.025	0.000	0.000	0.000	-0.094	NADH-ubiquinone/plastoquinone oxidoreductase chain 4L	-0.605
