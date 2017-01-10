@@ -85,22 +85,22 @@ class pt_classification:
             x_p = x_p.loc[rows, ]
             y_p = y_p.loc[rows, ]
             if not rec_dir is None:
-                if not os.path.exists("%s/pt%s.dat"%(rec_dir, int(pt) + 206)):
+                #if not os.path.exists("%s/pt%s.dat"%(rec_dir, int(pt) + 206):
+                if not os.path.exists("%s/pt%s.dat"%(rec_dir, pt)):
                     print "skipping pt", pt, "no reconstruction matrix found, possibly due to no reconstruction events for this phenotype"
                     continue
-                a = ps.read_csv("%s/pt%s.dat"%(rec_dir, int(pt) + 206), index_col = 0, sep = "\t", header = None)
+                #a = ps.read_csv("%s/pt%s.dat"%(rec_dir, int(pt) + 206), index_col = 0, sep = "\t", header = None)
+                a = ps.read_csv("%s/pt%s.dat"%(rec_dir, pt), index_col = 0, sep = "\t")
                 #HACK
                 #treat gains and losses the same
                 #only relevant for the parsimony case
                 if not parsimony_params is None :
                     raise Exception("not yet implemented")
-                #a[a==-1]=1
-                #discard the row names
-                #TODO change to panda dataframe to keep the row names
-                pfid2acc = ps.read_csv("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc.txt" , sep = "\t", header = None)
-                pt = a.shape[1] - 1 
-                a.columns = pfid2acc.iloc[:-93, 1].values.tolist() + [pt]
-                a = a.iloc[:,0:(a.shape[1])]
+                #pfid2acc = ps.read_csv("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc.txt" , sep = "\t", header = None)
+
+                #pt = a.shape[1] - 1 
+                a.columns = pf_mapping.index.tolist() + [pt]
+                #a = a.iloc[:,0:(a.shape[1])]
                 #phenotype index in the reconstruction matrix
                 x = a.loc[:, pf_mapping.index]
                 y = a.loc[:, pt]
