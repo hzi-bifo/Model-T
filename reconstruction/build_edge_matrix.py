@@ -242,7 +242,7 @@ class build_edge_matrix:
                 #else:
                 #    s+="0\t"
             #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
-            if pt in feats and pt in edge2char2val[tuple(e)]:
+            if pt not in feats and pt in edge2char2val[tuple(e)]:
                 #print "this shouldn't happen"
                 #sys.exit(0)
                 out_m.loc["_".join(e), pt] = edge2char2val[tuple(e)][pt]
