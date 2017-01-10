@@ -26,7 +26,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
     """discretize one or combine two matrices into one discretized matrix"""
     if loss_dir2 is None:
         for f1 in os.listdir(dir1):
-            m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0, header=None) 
+            m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0) 
             m =  single_matrix(m1, f1, t,   outdir, discretize_pt_only = discretize_pt_only)
             if is_internal:
                 return m
@@ -57,12 +57,9 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
             m = m1 + (1 - m1) * m2 
             drop_m = ~((m.iloc[:,m.shape[1] - 1] != 0) & (m.iloc[:,m.shape[1] - 1] < t)) 
             #drop condition for m2
-            #drop_m2 = ~((m2.iloc[:,m2.shape[1] - 1] != 0) & (m2.iloc[:,m2.shape[1] - 1] < t)) 
             #set all elements greater or equal the threshold to 1
             if discretize_pt_only:
-                #m1.loc[m1.iloc[:, m1.shape[1] - 1] >= t, m1.shape[1]] = 1
-                m.loc[m.iloc[:, m.shape[1] - 1] >= t, m.shape[1]] = 1
-                #print m.iloc[:, m.shape[1] - 1]
+                m.loc[m.iloc[:, m.shape[1] - 1] >= t, m.columns[m.shape[1] - 1]] = 1
             else:
                 m[m>=t] = 1
                 m[m<t] = 0
@@ -77,7 +74,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 f.write("%s\n"%i)
             f.close()
             #combine the two conditions
-            m = m[drop_m| (m.iloc[:,m.shape[1] - 1] >= 1)]
+            m = m[drop_m | (m.iloc[:,m.shape[1] - 1] >= 1)]
             if discretize_pt_only:
                 print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
             print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
@@ -93,7 +90,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 #sys.stderr.write("matrix m1 and m2 incompatible with threshold %s\n"%t)
                 #RAISe Exception
             #TODO only write to file if the call is external i.e. in the bulk discretization run
-            m.to_csv(os.path.join(outdir, m_f), sep="\t", header=None, index=True)
+            m.to_csv(os.path.join(outdir, m_f), sep="\t")
             if is_internal:
                 return m
 
