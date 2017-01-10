@@ -1,0 +1,4 @@
+_seqFile	dbcan.fasta
+_treeFile	../pbd.tre
+_calculateAncestralReconstruct	1
+_outDir	RESULTS_is

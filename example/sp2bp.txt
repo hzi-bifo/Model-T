@@ -1,0 +1,137 @@
+101510	Rhodococcus jostii RHA1
+1041826	Flavobacterium columnare ATCC 49512
+110662	Synechococcus sp. CC9605
+1140	Synechococcus elongatus PCC 7942
+1177927	Enterobacter cloacae subsp. cloacae GS1
+123214	Persephonella marina EX-H1
+156889	Magnetococcus marinus MC-1
+176299	Agrobacterium fabrum str. C58
+177439	Desulfotalea psychrophila LSv54
+178306	Pyrobaculum aerophilum str. IM2
+187272	Alkalilimnicola ehrlichii MLHE-1
+188937	Methanosarcina acetivorans C2A
+190192	Methanopyrus kandleri AV19
+203119	Clostridium thermocellum ATCC 27405
+203122	Saccharophagus degradans 2-40
+224325	Archaeoglobus fulgidus DSM 4304
+226186	Bacteroides thetaiotaomicron VPI-5482
+228410	Nitrosomonas europaea ATCC 19718
+243159	Acidithiobacillus ferrooxidans ATCC 23270
+243164	Dehalococcoides ethenogenes 195
+243365	Chromobacterium violaceum ATCC 12472
+246199	Ruminococcus albus 8
+259564	Methanococcoides burtonii DSM 6242
+264203	Zymomonas mobilis subsp. mobilis ZM4 = ATCC 31821
+266835	Mesorhizobium loti MAFF303099
+269796	Rhodospirillum rubrum ATCC 11170
+269798	Cytophaga hutchinsonii ATCC 33406
+269800	Thermobifida fusca YX
+272559	Bacteroides fragilis NCTC 9343
+272562	Clostridium acetobutylicum ATCC 824
+272564	Desulfitobacterium hafniense DCB-2
+272844	Pyrococcus abyssi GE5
+290340	Arthrobacter aurescens TC1
+292415	Thiobacillus denitrificans ATCC 25259
+293826	Alkaliphilus metalliredigens QYMF
+309799	Dictyoglomus thermophilum H-6-12
+317025	Thiomicrospira crunogena XCL-2
+318586	Paracoccus denitrificans PD1222
+322159	Streptococcus thermophilus LMD-9
+322710	Azotobacter vinelandii DJ
+323097	Nitrobacter hamburgensis X14
+323261	Nitrosococcus oceani ATCC 19707
+323848	Nitrosospira multiformis ATCC 25196
+324602	Chloroflexus aurantiacus J-10-fl
+326298	Sulfurimonas denitrificans DSM 1251
+326424	Frankia alni ACN14a
+330779	Sulfolobus acidocaldarius DSM 639
+335541	Syntrophomonas wolfei subsp. wolfei str. Goettingen
+338969	Rhodoferax ferrireducens T118
+339860	Methanosphaera stadtmanae DSM 3091
+347834	Rhizobium etli CFN 42
+349161	Desulfotomaculum reducens MI-1
+351348	Marinobacter aquaeolei VT8
+351607	Acidothermus cellulolyticus 11B
+351627	Caldicellulosiruptor saccharolyticus DSM 8903
+357809	Clostridium phytofermentans ISDg
+362948	Lactobacillus salivarius UCC118
+365044	Polaromonas naphthalenivorans CJ2
+366394	Sinorhizobium medicae WSM419
+368407	Methanoculleus marisnigri JR1
+369723	Salinispora tropica CNB-440
+370438	Pelotomaculum thermopropionicum SI
+377629	Teredinibacter turnerae T7901
+391037	Salinispora arenicola CNS-205
+393595	Alcanivorax borkumensis SK2
+394503	Clostridium cellulolyticum H10
+395963	Beijerinckia indica subsp. indica ATCC 9039
+395965	Methylocella silvestris BL2
+396588	Thioalkalivibrio sulfidophilus HL-EbGr7
+399549	Metallosphaera sedula DSM 5348
+399739	Pseudomonas mendocina ymp
+399795	Comamonas testosteroni KF-1
+402881	Parvibaculum lavamentivorans DS-1
+404380	Geobacter bemidjiensis Bem
+410358	Methanocorpusculum labreanum Z
+415426	Hyperthermus butylicus DSM 5456
+416591	Thermotoga lettingae TMO
+420247	Methanobrevibacter smithii ATCC 35061
+420662	Methylibium petroleiphilum PM1
+436308	Nitrosopumilus maritimus SCM1
+438753	Azorhizobium caulinodans ORS 571
+439235	Desulfatibacillum alkenivorans AK-01
+43989	Cyanothece sp. ATCC 51142
+446462	Actinosynnema mirum DSM 43827
+446466	Cellulomonas flavigena DSM 20109
+446470	Stackebrandtia nassauensis DSM 44728
+446471	Xylanimonas cellulosilytica DSM 15894
+448385	Sorangium cellulosum So ce56
+452471	Candidatus Amoebophilus asiaticus 5a2
+457428	Streptomyces lividans TK24
+471852	Thermomonospora curvata DSM 43183
+471855	Slackia heliotrinireducens DSM 20476
+478749	Marvinbryantia formatexigens DSM 14469
+485915	Desulfohalobium retbaense DSM 5692
+485918	Chitinophaga pinensis DSM 2588
+498211	Cellvibrio japonicus Ueda107
+507522	Klebsiella pneumoniae 342
+509191	Acetivibrio cellulolyticus CD2
+509192	Thermoanaerobacter ethanolicus JW 200
+515619	Eubacterium rectale ATCC 33656
+515622	Butyrivibrio proteoclasticus B316
+515635	Dictyoglomus turgidum DSM 6724
+521460	Caldicellulosiruptor bescii DSM 6725
+525897	Desulfomicrobium baculatum DSM 4028
+525898	Sulfurospirillum deleyianum DSM 6946
+525909	Acidimicrobium ferrooxidans DSM 10331
+535289	Acidovorax ebreus TPSY
+537012	Bacteroides cellulosilyticus DSM 14838
+557760	Rhodobacter sphaeroides KD131
+56780	Syntrophus aciditrophicus SB
+573061	Clostridium cellulovorans 743B (Prj:52819)
+573061	Clostridium cellulovorans 743B
+573064	Methanocaldococcus fervens AG86
+588581	Clostridium papyrosolvens DSM 2782
+590998	Cellulomonas fimi ATCC 484
+591167	Streptomyces flavogriseus ATCC 33331
+59374	Fibrobacter succinogenes subsp. succinogenes S85
+59374	Fibrobacter succinogenes subsp. succinogenes S85 (Prj:47)
+598659	Nautilia profundicola AmH
+608506	Caldicellulosiruptor obsidiansis OB47
+62928	Azoarcus sp. BH72
+632292	Caldicellulosiruptor hydrothermalis 108
+632335	Caldicellulosiruptor kristjanssonii 177R1B
+632348	Caldicellulosiruptor kronotskyensis 2002
+632516	Caldicellulosiruptor lactoaceticus 6A
+632518	Caldicellulosiruptor owensensis OL
+633697	Eubacterium cellulosolvens 6
+634452	Acetobacter pasteurianus IFO 3283-01
+63737	Nostoc punctiforme PCC 73102
+641112	Ruminococcus flavefaciens FD-1
+642492	Clostridium lentocellum DSM 5427
+649349	Leadbetterella byssophila DSM 17132
+665571	Spirochaeta thermophila DSM 6192
+697329	Ruminococcus albus 7
+697329	Ruminococcus albus 7 = DSM 20455
+744872	Treponema caldaria DSM 7334
+87626	Pseudoalteromonas tunicata D2
