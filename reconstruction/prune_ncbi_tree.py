@@ -33,7 +33,7 @@ def prune_ncbi_tree(full_tree_fn, ncbi_ids_fn, format_out, outfile, newick_exten
     if newick_extended:
         t.write(features = ["name", "scientific_name", "rank"], outfile=outfile, format=format_out)
     else:
-        t.write(outfile=outfile,format=format_out)
+        t.write(outfile=outfile,format=format_out, format_root_node = True)
 
 
 
