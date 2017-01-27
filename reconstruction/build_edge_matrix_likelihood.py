@@ -1,6 +1,5 @@
 import build_edge_matrix as bem
 import sys
-import named_narray as na
 import os
 import pandas as pd
 #import faulthandler
