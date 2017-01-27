@@ -25,13 +25,14 @@ def split(m, out_f, parts, randomize = True, phenotypes = None):
     for i in range(parts - parts_extended):
         part = m.iloc[:,i * part_size : (i + 1) * part_size]
         if m_pheno is not None:
-            part = pd.concat([m, m_pheno], axis = 1)
+            part = pd.concat([part, m_pheno], axis = 1)
         to_fasta(part, out_f,  i)
     #process subsets with size part_size + 1
     for i in range(parts_extended):
+        print i
         part = m.iloc[:, (parts - parts_extended) * part_size + i * (part_size + 1) : (parts - parts_extended) * part_size + (i + 1) * (part_size + 1)]
         if m_pheno is not None:
-            part = pd.concat([m, m_pheno], axis = 1)
+            part = pd.concat([part, m_pheno], axis = 1)
         to_fasta(part, out_f, parts - parts_extended + i)
 
 def to_fasta(m, out_n, index = None):
