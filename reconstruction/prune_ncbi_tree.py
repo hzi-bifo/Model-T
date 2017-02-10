@@ -1,7 +1,7 @@
 from ete2 import TreeNode, Tree
 import sys
 #read ncbi tree from saved newick file
-def prune_ncbi_tree(full_tree_fn, ncbi_ids_fn, format_out, outfile, newick_extended = False,  do_name_internal = False, failed_to_map = None):
+def prune_ncbi_tree(full_tree_fn, ncbi_ids_fn, format_out, outfile, newick_extended = False,  do_name_internal = False, failed_to_map = None, resolve_polytomy = False):
     t= TreeNode(full_tree_fn,1)
     print "read tree"
     #read in ncbi ids
@@ -21,6 +21,8 @@ def prune_ncbi_tree(full_tree_fn, ncbi_ids_fn, format_out, outfile, newick_exten
                     if tax_ids_exists[tax_id]:
                         ftm.write("%s\n"% tax_id)
         t.prune(tax_ids_existing)
+    if resolve_polytomy:
+        t.resolve_polytomy(recursive = True)
     if do_name_internal:
         n = 1
         t.rank = "bacteria"
@@ -53,5 +55,6 @@ if __name__ == "__main__":
     parser.add_argument("--format", type = int, help = "tree out format as in ete library", default = 1)
     parser.add_argument("--do_name_internal", action = "store_true",  help = "name internal nodes of the pruned tree by N1, N2 etc.")
     parser.add_argument("--newick_extended", action = "store_true",  help = "use extended newick for output")
+    parser.add_argument("--resolve_polytomy", action = "store_true",  help = "use this option if tree is not bifurcating, which is required by subsequent steps")
     args = parser.parse_args()
-    prune_ncbi_tree(args.tree, args.ncbi_ids, args.format, args.out, args.newick_extended, args.do_name_internal, args.failed_to_map)
+    prune_ncbi_tree(args.tree, args.ncbi_ids, args.format, args.out, args.newick_extended, args.do_name_internal, args.failed_to_map, args.resolve_polytomy)
