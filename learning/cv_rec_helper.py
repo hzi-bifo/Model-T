@@ -9,7 +9,7 @@ import subprocess
 import time 
 import sys
 
-def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, pt_out, ofold, ifold = None, discard_in_recon = None):
+def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, pt_out, ofold, ifold = None, consider_in_recon = None):
     """run gainLoss reconstruction for yp train"""
     #output directory for the gainLoss output (tmp does not mean this directory is removed afterwards) 
     if 'gainLoss_ref' in config:
@@ -44,15 +44,16 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
         g = open("%s/pt_train.tsv"%gainloss_dir, 'w')
         h = open("%s/pt_train.names.tsv"%gainloss_dir, 'w')
         for l in yp_train.index:
-            if not l in discard_in_recon:
+            if l in consider_in_recon.index:
                 f.write(">%s\n"%l)
                 f.write("%i\n"%yp_train.loc[l])
                 g.write("%i\n"%yp_train.loc[l])
                 h.write("%s\n"%l)
         #gainLoss programm also needs the taxa with missing pt 
-        all_taxa = ps.read_csv(config['phyn_f'], header = None) 
-        for l in all_taxa.iloc[:, 0]:
-            if not l in yp_train.index and l not in discard_in_recon:
+        all_taxa = ps.read_csv(config['phyn_f'], index_col = 0, sep = "\t") 
+        all_taxa.index = all_taxa.index.astype('string')
+        for l in all_taxa.index:
+            if not l in yp_train.index and l in consider_in_recon.index:
                 f.write(">%s\n"%l)
                 f.write("?\n")
                 g.write("?\n")
@@ -81,64 +82,65 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
         os.mkdir(tmp_dir)
     #mapping back gain events
     phypat = ps.read_csv("%s/pt_train.tsv"%gainloss_dir, header = None)
+    phypat.columns = [pt_out]
     index = ps.read_csv("%s/pt_train.names.tsv"%gainloss_dir, header = None)
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "gain":
         phypat.index = index.iloc[:,0].astype('string')
-        b = beml.build_edge_matrix_likelihood(config['tree_l_f'], "newick", phypat, "%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt"), use_likelihood = True, use_gain_events = True)
+        b = beml.build_edge_matrix_likelihood(config['tree_l_f'], "newick",  phypat, "%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt"), [], [pt_out],  use_likelihood = True, use_gain_events = True)
         #create gain output dir
         outdir_g = "%s/gain/"%tmp_dir
         if not os.path.exists(outdir_g):
             os.mkdir(outdir_g)
         if "continuous_target" in likelihood_params:
-            b.get_all_edge_m([0],[0], outdir_g)
+            b.get_all_edge_m([pt_out],[pt_out], outdir_g)
         else: 
-            b.get_all_edge_m([0],[0], outdir_g)
+            b.get_all_edge_m([pt_out],[pt_out], outdir_g)
             outdir_dlr = "%s/discretized_gain"%tmp_dir
             if not os.path.exists(outdir_g):
                 os.mkdir(outdir_dlr)
             #gain events only case
             if likelihood_params["mode"] == "gain":
-                if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")):
+                if not os.path.isfile(os.path.join(outdir_g, "pt%s.dat" % pt_out)):
                     if 'gainLoss_ref' in config:
                         shutil.rmtree(tmp_dir) 
                     raise ValueError("Phenotype has no events associated with it")    
-                m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
+                m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, [pt_out], is_internal = True) 
     #mapping back loss events
     if likelihood_params["mode"] == "gain_loss" or likelihood_params["mode"] == "loss":
-        b = beml.build_edge_matrix_likelihood(config['tree_l_f'], "newick", phypat, "%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt"), use_likelihood = True, use_gain_events = False)
+        b = beml.build_edge_matrix_likelihood(config['tree_l_f'], "newick", phypat,  "%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt"), [], [pt_out], use_likelihood = True, use_gain_events = False)
         #create gain output dir
         outdir_l = "%s/loss/"%tmp_dir
         if not os.path.exists(outdir_l):
             os.mkdir(outdir_l)
         if "continuous_target" in likelihood_params:
-            m = b.get_all_edge_m([0],[0], outdir_l, is_internal = True)
+            m = b.get_all_edge_m([pt_out],[pt_out], outdir_l, is_internal = True)
         else:
-            b.get_all_edge_m([0],[0], outdir_l)
+            b.get_all_edge_m([pt_out],[pt_out], outdir_l)
             outdir_dlr = "%s/discretized_loss"%tmp_dir
             if not os.path.exists(outdir_dlr):
                 os.mkdir(outdir_dlr)
             #loss events only case
             if likelihood_params["mode"] == "loss":
-                if not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+                if not os.path.isfile(os.path.join(outdir_l, "pt%s.dat" % pt_out)):
                     if 'gainLoss_ref' in config:
                         shutil.rmtree(tmp_dir) 
                     raise ValueError("Phenotype has no events associated with it")    
-                m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr, is_internal = True) 
+                m = dlr.threshold_matrix(outdir_l, float(likelihood_params["threshold"]), outdir_dlr, [pt_out], is_internal = True) 
     #combining gain and loss events
     if likelihood_params["mode"] == "gain_loss": 
-        if not os.path.isfile(os.path.join(outdir_g, "pt0.dat")) and not os.path.isfile(os.path.join(outdir_l, "pt0.dat")):
+        if not os.path.isfile(os.path.join(outdir_g, "pt%s.dat" % pt_out)) and not os.path.isfile(os.path.join(outdir_l, "pt%s.dat" % pt_out)):
             if 'gainLoss_ref' in config:
                 shutil.rmtree(tmp_dir) 
             raise ValueError("Phenotype has no events associated with it")  
         if "continuous_target" in likelihood_params:
             #join gain and loss event matrices
-            m = jlr.threshold_matrix(outdir_g, "",  outdir_l, is_internal = True)
+            m = jlr.threshold_matrix(outdir_g, "",  outdir_dlr, [pt_out], outdir_l, is_internal = True)
             
         else:
             outdir_dlr = "%s/discretized_gain_loss"%tmp_dir
             if not os.path.exists(outdir_dlr):
                 os.mkdir(outdir_dlr)
-            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, outdir_l, is_internal = True) 
+            m = dlr.threshold_matrix(outdir_g, float(likelihood_params["threshold"]), outdir_dlr, [pt_out], outdir_l, is_internal = True) 
     #drop first column that is due to genotype reconstruction and either empty or duplicate of phenotype column
     #delete reconstruction directory if a reconstruction reference directory was used
     #shutil.rmtree(tmp_dir) 
