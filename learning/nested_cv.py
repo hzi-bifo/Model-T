@@ -54,7 +54,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, discard_in_recon):
+    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -69,7 +69,7 @@ class nested_cv:
         self.cv_outer = cv_outer
         self.resume = resume
         self.pf2desc_f = pf2desc_f
-        self.discard_in_recon = discard_in_recon
+        self.consider_in_recon = consider_in_recon
 
     def transf_from_probs(self, x, y):
         """create a series of sample specific weights according to the probabilities"""
@@ -305,7 +305,7 @@ class nested_cv:
         if not self.parsimony_params is None:
             m = crh.reconstruct_pt_parsimony(yp_train, self.model_out, self.config, self.parsimony_params)
         else:
-            m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold, self.discard_in_recon)
+            m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold, self.consider_in_recon)
         all_pt_edges = set(x_r.index)
         train_pt_edges = set(m.index)
         #print len(all_pt_edges), "anzahl aller reconstruction samples"
