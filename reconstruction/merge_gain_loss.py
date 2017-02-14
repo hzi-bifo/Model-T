@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 def reduce(in_dir, out_dir, parts, feats, phenotypes): 
-    pts = pd.read_csv(phenotypes, sep = "\t", index_col = 0).index.tolist()
+    """concatenate matrices in in_dir"""
+    pts = pd.read_csv(phenotypes, sep = "\t", index_col = 0).index.astype('string').tolist()
     feats = pd.read_csv(feats, sep = "\t", index_col = 0).index.tolist()
     for pt in pts:
         m_compl = None 
@@ -12,9 +13,8 @@ def reduce(in_dir, out_dir, parts, feats, phenotypes):
                 break
             m = pd.read_csv(fn, sep = "\t", index_col = 0)
             if m_compl is None:
-                m_compl = pd.DataFrame(pd.np.zeros((m.shape[0], len(feats) + len(pts))))
-                m_compl.columns = feats + pts
-                print m_compl.columns
+                m_compl = pd.DataFrame(pd.np.zeros((m.shape[0], len(feats) + 1)))
+                m_compl.columns = feats + [pt]
                 m_compl.index = m.index
             m_compl.loc[:, m.columns] = m
         if not os.path.exists(out_dir):
