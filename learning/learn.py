@@ -4,7 +4,7 @@ import os.path
 import sys
 import shutil
 import getopt
-import pandas as ps
+import pandas as pd
 import random
 import json
 import warnings
@@ -15,16 +15,10 @@ class pt_classification:
 
     def write_miscl(self, model_out, pt_out, miscl_plus):
         """map the misclassified sample ids to their scientific names and taxonomic ids"""
-        gideon_f = open(self.config['sp2taxid'], "r")
-        ls = gideon_f.readlines()
-        id2sp = {}
-        f = open("%s/%s_miscl.txt"%(model_out, pt_out), 'w')
-        for i in range(len(ls)):
-            elems = ls[i].strip().split("\t")
-            id2sp[str(elems[0])] = elems[1]
-        for i in range(miscl_plus.shape[0]):
-            f.write("%s\t%s\t%s\t%s\n"%(miscl_plus.index[i], miscl_plus.iloc[i,0], miscl_plus.iloc[i,1], id2sp[str(miscl_plus.index[i])]))
-        f.close()
+        miscl_m = pd.read_csv(self.config["phyn_f"], sep = "\t", index_col = 0)
+        miscl_m.index = miscl_m.index.astype('string')
+        pd.concat([miscl_plus, miscl_m.loc[miscl_plus.index,]], axis = 1).to_csv("%s/%s_miscl.txt"%(model_out, pt_out), sep = "\t")
+
     
     def setup_folds_synthetic(self, x, folds):
         #short folds length
@@ -35,7 +29,7 @@ class pt_classification:
     
 
     
-    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_normalization, resume, parsimony_params = None, discard_in_recon = None, with_seed = False):
+    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, ids2name, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_normalization, resume, tree, tree_named, parsimony_params = None, consider_in_recon = None, with_seed = False):
         """main routine to prepare data for classification and feature selection"""
         if with_seed:
             random.seed(0)
@@ -55,14 +49,18 @@ class pt_classification:
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
-        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, discard_in_recon)
+        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon)
         if not os.path.exists(model_out):
             os.mkdir(model_out)
         #write config to disk
         with open("%s/config.json" % self.model_out, 'w') as out_f:
             json.dump(self.config, out_f, indent=4, separators=(',', ': '))
+        self.config['tree_f'] = tree
+        self.config['tree_l_f'] = tree_named
+        self.config['phyn_f'] = ids2name 
         #read in phyletic patterns
-        p = ps.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0)
+        p = pd.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0)
+        p.index = p.index.astype('string')
         #check if this is a new run or if the current run shall be recomputed
         if self.resume:
             f = open("%s/cv_acc.txt"%self.model_out, "a")
@@ -72,8 +70,8 @@ class pt_classification:
         if not os.path.exists("%s/pickled"%self.model_out):
             os.mkdir("%s/pickled"%self.model_out)
         #iterate over all phenotypes
-        pf_mapping = ps.read_csv(pf2acc_desc_f, index_col = 0, sep = "\t") 
-        pt_mapping = ps.read_csv(pt2acc_f, index_col = 0, sep = "\t")
+        pf_mapping = pd.read_csv(pf2acc_desc_f, index_col = 0, sep = "\t") 
+        pt_mapping = pd.read_csv(pt2acc_f, index_col = 0, sep = "\t")
         pt_mapping.index = pt_mapping.index.values.astype('string')
         for pt in pt_mapping.index:
             pt_out = pt
@@ -89,14 +87,15 @@ class pt_classification:
                 if not os.path.exists("%s/pt%s.dat"%(rec_dir, pt)):
                     print "skipping pt", pt, "no reconstruction matrix found, possibly due to no reconstruction events for this phenotype"
                     continue
-                #a = ps.read_csv("%s/pt%s.dat"%(rec_dir, int(pt) + 206), index_col = 0, sep = "\t", header = None)
-                a = ps.read_csv("%s/pt%s.dat"%(rec_dir, pt), index_col = 0, sep = "\t")
+                #a = pd.read_csv("%s/pt%s.dat"%(rec_dir, int(pt) + 206), index_col = 0, sep = "\t", header = None)
+                a = pd.read_csv("%s/pt%s.dat"%(rec_dir, pt), index_col = 0, sep = "\t")
+                a.index = a.index.astype('string')
                 #HACK
                 #treat gains and losses the same
                 #only relevant for the parsimony case
                 if not parsimony_params is None :
                     raise Exception("not yet implemented")
-                #pfid2acc = ps.read_csv("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc.txt" , sep = "\t", header = None)
+                #pfid2acc = pd.read_csv("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc.txt" , sep = "\t", header = None)
 
                 #pt = a.shape[1] - 1 
                 a.columns = pf_mapping.index.tolist() + [pt]
@@ -140,7 +139,7 @@ class pt_classification:
             print "pt_out", pt, "with", sum(y_p>0), "positive samples and", sum(y_p<=0), "negative samples"
             if not cv_inner is None:
                 try:
-                    all_preds = ps.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
+                    all_preds = pd.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
                 except ValueError as e:
                     import traceback
                     print traceback.print_exc(e)
@@ -164,12 +163,12 @@ class pt_classification:
                 miscl = y_p_t.index[(all_preds != y_p_t)]
                 #bind actual labels and predictions
                 #print miscl, y_p_t.loc[miscl], all_preds.loc[miscl]
-                miscl_plus = ps.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
+                miscl_plus = pd.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
                 #print miscl_plus
                 self.write_miscl(model_out, pt_out, miscl_plus)
                 f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
                 f.flush()
-            all_preds = ps.DataFrame(self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out))
+            all_preds = pd.DataFrame(self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out))
             #temporary hack to the get random generator into place
             folds = self.setup_folds_synthetic(len(x), cv_outer)
             #folds_inner = self.setup_folds_synthetic(folds[1], 10)
@@ -196,10 +195,13 @@ if __name__=="__main__":
     parser.add_argument("pf2acc_desc_f", help = "pfam mapping file")
     parser.add_argument("pt2acc_f", help = "phenotype mapping file")
     parser.add_argument("config_f", help = "location of the config file")
+    parser.add_argument("ids2name", help = "mapping of sample ids to names")
 
     parser.add_argument("--rec_dir", default = None, help='one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes')
     parser.add_argument("--with_seed", action = 'store_true', help='set a seed for reproducable cross validations etc.')
     parser.add_argument("--likelihood_params", default = None, help='<threshold:x,mode:<gain, loss, gain_loss>> only use if in reconstruction classification i.e. option -d is set as well')
+    parser.add_argument("--tree", default = None, help='tree for the likelihood reconstruction')
+    parser.add_argument("--tree_named", default = None, help='named tree for the likelihood reconstruction')
     parser.add_argument("--is_phypat_and_rec", action = "store_true", help='only use if in reconstruction classification i.e. option likelihood_params is set as well; training will be done on the gains and losses and the phyletic patterns')
     parser.add_argument("--do_normalization",  action = "store_true", help = "use raw data with normalization and don't binarize")
     parser.add_argument("--perc_feats", default = 1.0, type = int, help = "percent of features to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included")
@@ -207,7 +209,7 @@ if __name__=="__main__":
     parser.add_argument("--inverse_feats", action = "store_true", help = "if option set, extend the feature space in the classification by the inverse features (1-X) to get rid of noise features")
     parser.add_argument("--resume", action = "store_true", help = "if set the program tries to resume the classification / feature selection i.e. the output directory already exists")
     parser.add_argument("--cv_inner", type = int, default = None, help = 'the number of folds used for inner cross validation if this option is given nested cross validation will be performed otherwise only feature selection routines will launched') 
-    parser.add_argument("--discard_in_recon",  default = [], help = 'list of samples that are only contained with a phyletic pattern but not in the tree') 
+    parser.add_argument("--consider_in_recon",  default = [], help = 'list of samples that are only contained with a phyletic pattern but not in the tree') 
     parser.add_argument("--n_jobs", type = int, default = 1, help = "number of jobs that shall be used")
     #-a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
     #parsimony_params = None
@@ -215,14 +217,18 @@ if __name__=="__main__":
     a = parser.parse_args()
     if not a.likelihood_params is None:
         a.likelihood_params =  dict(i.split(":") for i in a.likelihood_params.strip().split(","))
-    #parse samples that shall be discarded in the reconstruction
-    if not a.discard_in_recon == []:
-        a.discard_in_recon = ps.read_csv(a.discard_in_recon, header = None).iloc[:, 0].tolist()
+    #parse samples that shall be considered in the reconstruction
+    if not a.consider_in_recon == []:
+        a.consider_in_recon = pd.read_csv(a.consider_in_recon, index_col = 0, header = None)
+        a.consider_in_recon.index = a.consider_in_recon.index.astype('string')
     #parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
     if os.path.exists(a.out) and not a.resume:
         #sys.stderr.write("output directory %s already exists; delete and rerun\n"%a.out)
         #sys.exit(1)
         pass
     elif not os.path.exists(a.out):
-        os.mkdir(a.out)
-    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume, discard_in_recon = a.discard_in_recon, with_seed = a.with_seed) 
+        try:
+            os.mkdir(a.out)
+        except OSError:
+            pass
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, ids2name = a.ids2name, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume, consider_in_recon = a.consider_in_recon, with_seed = a.with_seed, tree = a.tree, tree_named = a.tree_named) 
