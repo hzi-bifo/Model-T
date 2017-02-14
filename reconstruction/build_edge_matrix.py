@@ -226,8 +226,7 @@ class build_edge_matrix:
         #out_fo = open(out_f, 'w')
         if not pt in feats:
             out_m = pd.DataFrame(np.zeros(shape = (len(edges), len(feats) + 1)))
-            out_m.columns = feats.tolist() + [pt]
-            print out_m.columns
+            out_m.columns = feats + [pt]
         else:
             out_m = pd.DataFrame(np.zeros(shape = (len(edges), len(feats))))
             out_m.columns = feats 

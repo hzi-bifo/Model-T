@@ -9,9 +9,11 @@ import dendropy as dp
 
 class build_edge_matrix_likelihood(bem.build_edge_matrix):
 
-    def __init__(self,tree_f, format, phy, event_f, pf_ids, pt_ids, use_gain_events=True, use_likelihood=True):
+    def __init__(self,tree_f, format, phy, event_f, pf_ids, pt_ids = [], use_gain_events=True, use_likelihood=True):
         #t = dp.Tree()
         t = dp.Tree.get(path = tree_f, schema = 'newick', suppress_internal_node_taxa=False)
+        self.pf_ids = pf_ids
+        self.pt_ids = pt_ids
         self.tree = t
         self.label2node = self.get_label_map()
         self.phy = phy
@@ -46,10 +48,10 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
                 continue
             ancestor = self.label2node[node].parent_node.taxon.label
             #map characters to their events, -1 to begin counting by zero as gainLoss output starts counting at 1!
-            if not (pf_ids.tolist() + pt_ids.tolist())[int(char) - 1] in char2ev:
-                char2ev[(pf_ids.tolist() + pt_ids.tolist())[int(char) - 1]] = [(node,ancestor,etype, prob, exp)]
+            if not (self.pf_ids + self.pt_ids)[int(char) - 1] in char2ev:
+                char2ev[(self.pf_ids + self.pt_ids)[int(char) - 1]] = [(node,ancestor,etype, prob, exp)]
             else: 
-                char2ev[(pf_ids.tolist() + pt_ids.tolist())[int(char) - 1]].append((node,ancestor,etype, prob, exp))
+                char2ev[(self.pf_ids + self.pt_ids)[int(char) - 1]].append((node,ancestor,etype, prob, exp))
         return char2ev
 
 
@@ -133,8 +135,8 @@ if __name__ == '__main__':
     else:
         os.mkdir(a.outdir)
     #read pf and pt file
-    pf_ids = pd.read_csv(a.feature_f, sep = "\t", index_col = 0).index
-    pt_ids = pd.read_csv(a.phenotype_f, sep = "\t", index_col = 0).index.astype('string')
+    pf_ids = pd.read_csv(a.feature_f, sep = "\t", index_col = 0).index.tolist()
+    pt_ids = pd.read_csv(a.phenotype_f, sep = "\t", index_col = 0).index.astype('string').tolist()
     phy = pd.read_csv(a.phypat_pt_f, index_col = 0, sep = "\t")
     phy.index = phy.index.astype('string')
     bem = build_edge_matrix_likelihood(a.tree, a.format, phy, a.event_f, pf_ids, pt_ids, use_likelihood = not a.use_expected, use_gain_events = not a.consider_loss_events)
