@@ -1,14 +1,14 @@
 """reads in a max likelihood reconstruction matrix and discretizes the entries based on a likelihood threshold"""
 import os.path
-import pandas
+import pandas as pd
 import sys
 import numpy as np
 
-def single_matrix(m, f,  t,  outdir, discretize_pt_only = False):
+def single_matrix(m, pt,  t,  outdir, discretize_pt_only = False):
     """discretize a single matrix""" 
-    print "processing file %s"%(f)
+    print "processing file %s"%(pt)
     if discretize_pt_only:
-        m.loc[m.iloc[:, m.shape[1] - 1] >= t, m.shape[1]] = 1
+        m.loc[m.iloc[:, m.shape[1] - 1] >= t, m.columns[m.shape[1] - 1]] = 1
     else: 
         m[m >= t] = 1
     s = m.shape
@@ -19,39 +19,45 @@ def single_matrix(m, f,  t,  outdir, discretize_pt_only = False):
         print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
     print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
     print "there were %s samples removed due to unclear status" % (s[0] - m.shape[0])
-    m.to_csv(os.path.join(outdir, f), sep="\t", header=None, index=True)
+    m.to_csv(os.path.join(outdir, "pt%s.dat"%pt), sep="\t")
     return m
 
-def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False ,is_internal = False, ):
+def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only = False,  is_internal = False):
     """discretize one or combine two matrices into one discretized matrix"""
+    if not os.path.exists(outdir):
+        #if script is run in parallel the directory might have been created already
+        try:
+            os.mkdir(outdir)
+        except OSError:
+            pass
     if loss_dir2 is None:
-        for f1 in os.listdir(dir1):
-            m1 = pandas.read_csv(os.path.join(dir1, f1), sep="\t", index_col=0) 
-            m =  single_matrix(m1, f1, t,   outdir, discretize_pt_only = discretize_pt_only)
+        for pt in pts:
+            m1 = pd.read_csv(os.path.join(dir1, "pt%s.dat" % pt), sep="\t", index_col=0) 
+            m =  single_matrix(m1, pt, t,   outdir, discretize_pt_only = discretize_pt_only)
             if is_internal:
                 return m
 
     if not loss_dir2 is None:
-        m_set = set(os.listdir(dir1)) | set(os.listdir(loss_dir2))
-        for m_f in m_set:
-            if os.path.isfile(os.path.join(dir1, m_f)):
-                m1 = pandas.read_csv(os.path.join(dir1, m_f), sep="\t", index_col=0) 
+        #m_set = set(os.listdir(dir1)) | set(os.listdir(loss_dir2))
+        for pt in pts:
+            if os.path.isfile(os.path.join(dir1, "pt%s.dat" % pt)):
+                m1 = pd.read_csv(os.path.join(dir1, "pt%s.dat" % pt), sep="\t", index_col=0) 
             else: 
                 #no gain event file found, go into single matrix case
-                m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0) 
-                m =  single_matrix(m2, m_f, t, outdir, discretize_pt_only = discretize_pt_only)
+                m2 = pd.read_csv(os.path.join(loss_dir2, "pt%s.dat" % pt), sep="\t", index_col=0) 
+                m =  single_matrix(m2, pt, t, outdir, discretize_pt_only = discretize_pt_only)
                 if is_internal:
                     return m
                 continue 
-            if os.path.isfile(os.path.join(loss_dir2, m_f)):
-                m2 = pandas.read_csv(os.path.join(loss_dir2, m_f), sep="\t", index_col=0) 
+            if os.path.isfile(os.path.join(loss_dir2, "pt%s.dat" % pt)):
+                m2 = pd.read_csv(os.path.join(loss_dir2, "pt%s.dat" % pt), sep="\t", index_col=0) 
             else: 
                 #no loss event file found, go into single matrix case
-                m = single_matrix(m1, m_f, t, outdir, discretize_pt_only = discretize_pt_only)
+                m = single_matrix(m1, pt, t, outdir, discretize_pt_only = discretize_pt_only)
                 if is_internal:
                     return m
                 continue
-            print "processing file %s/%s"%(loss_dir2, m_f)
+            print "processing file %s/pt%s.dat"%(loss_dir2, pt)
             #drop condition for m1 where the pt is non-zero but does not exceed the threshold
             #join gains and losses
             m = m1 + (1 - m1) * m2 
@@ -69,7 +75,7 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
             s = m.shape
             #write to file all those samples that have been dropped due to unclear phenotype status
             #TODO not yet tested
-            f = open(os.path.join(outdir, "%s_%s" %(m_f, "dropped_samples.txt")), 'w')
+            f = open(os.path.join(outdir, "%s_%s" %(pt, "dropped_samples.txt")), 'w')
             for i in m[~(drop_m | (m.iloc[:,m.shape[1] - 1] >= 1))].index:
                 f.write("%s\n"%i)
             f.close()
@@ -90,51 +96,23 @@ def threshold_matrix(dir1, t, outdir, loss_dir2=None,discretize_pt_only = False 
                 #sys.stderr.write("matrix m1 and m2 incompatible with threshold %s\n"%t)
                 #RAISe Exception
             #TODO only write to file if the call is external i.e. in the bulk discretization run
-            m.to_csv(os.path.join(outdir, m_f), sep="\t")
+            m.to_csv(os.path.join(outdir, "pt%s.dat" % pt), sep="\t")
             if is_internal:
                 return m
 
 
 if __name__=="__main__":
     #test script
-    import getopt
     import sys
-    if len(sys.argv) == 1:
-        print """USAGE: python %s
--d <input dir> with edge matrices corresponding to the likelihood of gain or loss events
--t <threshold> threshold to discretize the likelihood matrices i.e. transform them into actual reconstruction events i.e. m [ m > threshold ] = 1 ; m [ m < threshold] = 0 
--o <out dir> for the discretized matrices 
--f <optional second directory> with gain or loss likelihood matrices that shall be combined with those given in the input dir specified by the -d option
--g if option set discretize phenotypes only
-        """ % (sys.argv[0])
-        sys.exit(1)
-    try:
-        optlist, args = getopt.getopt(sys.argv[1:], "d:t:o:f:g")
-    except getopt.GetoptError as err:
-        # print help information and exit:
-        print str(err)  # will print something like "option -a not recognized"
-        sys.exit(2)
-    dir1 = None
-    t = None
-    out = None
-    dir2 = None
-    discretize_pt_only = False 
-    for o, a in optlist:
-        if o == "-d":
-            dir1 = a
-        if o == "-t":
-            t = float(a)
-        if o == "-o":
-            out = a 
-            if os.path.exists(out):
-                sys.stderr.write("output directory %s already exists; delete and rerun\n"%a)
-                sys.exit(1)
-            else:
-                os.mkdir(out)
-        if o == "-f":
-            dir2 = a
-        if o == "-g":
-            discretize_pt_only = True
-    threshold_matrix(dir1, t, out, dir2, discretize_pt_only = discretize_pt_only)
-    #threshold_matrix("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_prob", t=0.5, outdir="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_prob0.5/")
-    #threshold_matrix("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_prob",loss_dir2="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/loss_prob", t=0.5, outdir="/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus_sample30/likelihood/gain_loss_prob0.5/")
+    import argparse
+    parser = argparse.ArgumentParser("traitar-model the phenotype classifier")
+    parser.add_argument("in_dir", help='<input dir> with edge matrices corresponding to the likelihood of gain or loss events')
+    parser.add_argument("out_dir", help='<out dir> for the discretized matrices ')
+    parser.add_argument("phenotypes", help='list of phenotypes to be processed')
+    parser.add_argument("--in_dir_2", default = None, help='<optional second directory> with gain or loss likelihood matrices that shall be combined with those given in the input dir specified by the <in_dir> option')
+    parser.add_argument("--threshold", default = 0.5,  help="threshold to discretize the likelihood matrices i.e. transform them into actual reconstruction events i.e. m [ m > threshold ] = 1 ; m [ m < threshold] = 0" )
+    parser.add_argument("--discretize_pt_only", help='if option set discretize phenotypes only', action = "store_true")
+    a = parser.parse_args()
+    #read in phenotype list
+    pts = pd.read_csv(a.phenotypes, sep = "\t", index_col = 0).index.astype('string')
+    threshold_matrix(a.in_dir, a.threshold, a.out_dir, pts, a.in_dir_2, a.discretize_pt_only)
