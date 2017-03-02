@@ -12,6 +12,8 @@ def single_matrix(m, pt,  t,  outdir, discretize_pt_only = False):
     else: 
         m[m >= t] = 1
     s = m.shape
+    #write to disk complete matrix
+    m.to_csv(os.path.join(outdir, "pt%s.dat"%pt), sep="\t")
     #drop edges / samples that do not exceed the phenotype threshold 
     m = m[~((m.iloc[:,m.shape[1] - 1] != 0) & (m.iloc[:,m.shape[1] - 1] < t))]
     if not discretize_pt_only:
@@ -19,7 +21,7 @@ def single_matrix(m, pt,  t,  outdir, discretize_pt_only = False):
         print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
     print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
     print "there were %s samples removed due to unclear status" % (s[0] - m.shape[0])
-    m.to_csv(os.path.join(outdir, "pt%s.dat"%pt), sep="\t")
+    m.to_csv(os.path.join(outdir, "pt%s_pruned.dat"%pt), sep="\t")
     return m
 
 def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only = False,  is_internal = False):
@@ -69,12 +71,10 @@ def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only 
             else:
                 m[m>=t] = 1
                 m[m<t] = 0
-                #m2[m2>=t] = 1
-                #m2[m2<t] = 0
-                #m = m1 + m2
             s = m.shape
+            #write to disk complete matrix
+            m.to_csv(os.path.join(outdir, "pt%s.dat" % pt), sep="\t")
             #write to file all those samples that have been dropped due to unclear phenotype status
-            #TODO not yet tested
             f = open(os.path.join(outdir, "%s_%s" %(pt, "dropped_samples.txt")), 'w')
             for i in m[~(drop_m | (m.iloc[:,m.shape[1] - 1] >= 1))].index:
                 f.write("%s\n"%i)
@@ -85,18 +85,8 @@ def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only 
                 print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
             print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
             print "there were %s samples removed due to unclear status" % (s[0] - m.shape[0])
-            #for debugging purposes only
-            #if any(m > 1):
-                #get the elements that are ambigous
-                #for i in m.index:
-                #    if any(m.loc[i] > 1):
-                #        print m.loc[i][m.loc[i] > 1]
-                #        print m1.loc[i][m1.loc[i] > t]
-                #        print m2.loc[i][m2.loc[i] > t]
-                #sys.stderr.write("matrix m1 and m2 incompatible with threshold %s\n"%t)
-                #RAISe Exception
             #TODO only write to file if the call is external i.e. in the bulk discretization run
-            m.to_csv(os.path.join(outdir, "pt%s.dat" % pt), sep="\t")
+            m.to_csv(os.path.join(outdir, "pt%s_pruned.dat" % pt), sep="\t")
             if is_internal:
                 return m
 
