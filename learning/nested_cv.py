@@ -1,21 +1,11 @@
-#params:
-#indices for target variables (phenotypes)
-#out
-#import liblinear as ll
-#from liblinear import *
 import numpy as np
-import pandas as ps
+import pandas as pd
 import sklearn.svm as svm
 from joblib import Parallel, delayed, load, dump
 #TODO use the sklearn version of joblib instead to remove the direct joblib dependency
 from operator import itemgetter
 import math
 import random
-#random.seed(1)
-#initialize with seed
-#TODO put this into a class and use random state from gideon script
-#random_nested_cv = random.Random()
-#random_nested_cv.seed(1)
 import cv_rec_helper as crh 
 import sys
 import itertools
@@ -23,6 +13,7 @@ import sklearn.preprocessing as preprocessing
 import copy_reg
 import types
 import os
+import scipy.stats
 
 
 def _pickle_method(method):
@@ -93,18 +84,13 @@ class nested_cv:
                 w.append(y[yi])
                 if "extend" in self.likelihood_params:
                     w.append(1 - y[yi])
-        return x.iloc[x_index,], ps.Series(y_extd), ps.Series(w)
+        return x.iloc[x_index,], pd.Series(y_extd), pd.Series(w)
     
     def normalize(self, array):
         """normalize a feature matrix"""
         scaler = preprocessing.StandardScaler(with_mean = True, with_std = True).fit(array)
-        transformed = ps.DataFrame(data = scaler.transform(array), index = array.index, columns = array.columns)
+        transformed = pd.DataFrame(data = scaler.transform(array), index = array.index, columns = array.columns)
         return transformed, scaler
-        #return  scaler, cs
-    
-    
-    def get_pfam_names_and_descs(self, feats):
-        """map features to their pfam names and descriptions via a mapping file"""
     
     @staticmethod 
     def confusion_m(y,y_pred):
@@ -113,7 +99,7 @@ class nested_cv:
         FN = (y[y == 1] != y_pred[y == 1]).sum()
         TN = (y[y == -1] == y_pred[y == -1]).sum()
         FP = (y[y == -1] != y_pred[y == -1]).sum()
-        return ps.np.array([TN, FP, FN, TP])
+        return pd.np.array([TN, FP, FN, TP])
 
     @staticmethod 
     def recall_pos(y,y_pred):
@@ -149,6 +135,7 @@ class nested_cv:
         if (TP + FP) == 0:
             return 0
         return TP / float(TP + FP)   
+
     @staticmethod 
     def precision_conf(conf):
         """compute precision"""
@@ -165,11 +152,8 @@ class nested_cv:
     def balance_weights(self, weights, y):
         """balance weights between pos/neg class in phyletic pattern and in the reconstruction based samples """
         weights.index = y.index
-        #print weights
-        weights[y == -1]  = weights[y == -1] / weights[y == -1].sum() * 40 
-        weights[y == 1]  = weights[y == 1] / weights[y == 1].sum() * 40
-        #print y
-        #print weights
+        weights[y == -1]  = weights[y == -1] / weights[y == -1].sum() 
+        weights[y == 1]  = weights[y == 1] / weights[y == 1].sum()
         return weights
     
     
@@ -179,7 +163,7 @@ class nested_cv:
             #transform x and y
             x_train, y_train, w = self.transf_from_probs(x_train, y_train, self.likelihood_params)
         else:
-            w = ps.Series(np.ones(shape = len(y_train)) )
+            w = pd.Series(np.ones(shape = len(y_train)) )
         #set y negative labels to -1
         y_train.index = x_train.index
         w.index = x_train.index
@@ -192,7 +176,7 @@ class nested_cv:
         #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
             no_classifier = 1
-        all_preds = ps.DataFrame(np.zeros(shape = (x_test.shape[0], no_classifier)))
+        all_preds = pd.DataFrame(np.zeros(shape = (x_test.shape[0], no_classifier)))
         for i in range(no_classifier):
             #select a subset of features for classification
             sample_feats = sorted(random.sample(x_train.columns, int(math.floor(x_train.shape[1] * self.perc_feats))))
@@ -221,30 +205,30 @@ class nested_cv:
                 #END EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
                 xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
                 #EXPERIMENTAL BALANCE WEIGHTS
-                #sample_weight = ps.concat([balance_weights(w, y_train_t), balance_weights(ps.Series(np.ones(len(yp_train_t))), yp_train_t)])
+                #sample_weight = pd.concat([balance_weights(w, y_train_t), balance_weights(pd.Series(np.ones(len(yp_train_t))), yp_train_t)])
                 #print sample_weight.sum(), "sample weights total"
                 #END EXPERIMENTAL BALANCE WEIGHTS
-                X = ps.concat([x_train_sub, xp_train_sub], axis = 0)
+                X = pd.concat([x_train_sub, xp_train_sub], axis = 0)
                 if self.inverse_feats:
                     #add inverse features
-                    X = ps.concat([X,1-X], axis = 1) 
+                    X = pd.concat([X,1-X], axis = 1) 
                 if self.do_normalization:
                     X, scaler = self.normalize(X)
-                y = ps.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
+                y = pd.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
                 predictor.fit(X = X, y = y)
             else: 
                 if self.inverse_feats:
                     #add inverse features
-                    x_train_sub = ps.concat([x_train_sub, 1 - x_train_sub], axis = 1) 
+                    x_train_sub = pd.concat([x_train_sub, 1 - x_train_sub], axis = 1) 
                 if self.do_normalization:
                     x_train_sub, scaler = self.normalize(x_train_sub)
                 predictor.fit(x_train_sub, y_train_t_sub)
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
                 #add inverse features to test sample
-                x_test_sample = ps.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
+                x_test_sample = pd.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
             if self.do_normalization:
-                x_test_sample = ps.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
+                x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
         #do majority vote to aggregate predictions
         aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
@@ -271,13 +255,13 @@ class nested_cv:
     
     def join_edges(self, x_r, train2all, likelihood_params, parsimony_params):
         """aggregate edges in the full reconstruction matrix to fit the joint edges in train2all"""
-        df = ps.DataFrame()
+        df = pd.DataFrame()
         for e in train2all:
             #aggregate rows by summing up
             if not self.likelihood_params is None:
                 if not 'gt_probs' in self.likelihood_params:
                     cs = x_r.loc[train2all[e], :].sum(axis=0)
-                    df = ps.concat([df, cs], axis = 1)
+                    df = pd.concat([df, cs], axis = 1)
                 else:
                     #sum up the probabilities
                     cs = np.zeros(shape = x_r.shape[1])
@@ -286,7 +270,7 @@ class nested_cv:
                         #print "being aggregated", x_r.loc[train2all[e], :].iloc[i, :]
                         cs = cs + (1 - cs) * x_r.loc[train2all[e], :].iloc[i, :]
                         #print "after aggregation", cs
-                    df = ps.concat([df, ps.Series(cs)], axis = 1)
+                    df = pd.concat([df, pd.Series(cs)], axis = 1)
             else: 
                 raise Exception("parsimony case not yet implemented")    
         #make sure there are no entries in the summed up likelihood matrix other than 0 and 1
@@ -330,10 +314,10 @@ class nested_cv:
         training_edges = all_pt_edges.intersection(train_pt_edges)
         #print x_r.loc[training_edges,:].shape
         #print joint_x_r.shape, joint_x_r.index
-        x_r_train = ps.concat([x_r.loc[training_edges,:], joint_x_r], axis = 0)
+        x_r_train = pd.concat([x_r.loc[training_edges,:], joint_x_r], axis = 0)
         #print "x_r_train shape", x_r_train.shape
         #print "x_r_train index", x_r_train.index
-        y_r_train = ps.concat([m.loc[training_edges, :].iloc[:,0], joint_y_r], axis = 0)
+        y_r_train = pd.concat([m.loc[training_edges, :].iloc[:,0], joint_y_r], axis = 0)
         y_r_train[y_r_train == 2] = 1
         #print "y_r_train shape", y_r_train.shape
         #replace negative labels with -1
@@ -393,8 +377,6 @@ class nested_cv:
         if only cv_outer is given do a cross validation for each value of the paramter C given
         if cv_inner is given, do a nested cross validation optimizing the paramter C in the inner loop"""
         #do n fold cross validation
-        #number of elements in each invidual fold
-        #print y_p.index, y.index
         if not cv_inner is None:
             ofolds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
             print "outer folds set up"
@@ -403,8 +385,7 @@ class nested_cv:
                 x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test  = ofolds[i]
                 ifolds = self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i)
                 print "inner folds set up"
-                #dump(ofolds, "%s/%s_%s_ifolds.pickled" % (self.model_out, self.pt_out, i))
-                all_preds = ps.DataFrame(np.zeros(shape=[len(yp_train), len(self.config['c_params'])]))
+                all_preds = pd.DataFrame(np.zeros(shape=[len(yp_train), len(self.config['c_params'])]))
                 all_preds.columns = self.config['c_params']
                 all_preds.index = yp_train.index
                 #do inner cross validation
@@ -416,7 +397,7 @@ class nested_cv:
                 preds_ordered = [[] for i in range(len(self.config['c_params']))]
                 for i in range(len(preds)):
                     preds_ordered[i % len(self.config['c_params'])] += preds[i]
-                all_preds = ps.DataFrame(np.array(preds_ordered), index = self.config['c_params'], columns = yp_train.index).T
+                all_preds = pd.DataFrame(np.array(preds_ordered), index = self.config['c_params'], columns = yp_train.index).T
                 #determine C param with the best accuracy
                 #copy yp train and change the negative labels from 0 to -1
                 yp_t_t = yp_train.copy()
@@ -431,11 +412,9 @@ class nested_cv:
             return ocv_preds
         
         folds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
-        #for i in folds:
-        #    for j in i: 
-        #print j.shape
+        #store predictions for each fold in all_preds
         all_preds = np.zeros(shape=[len(y_p), len(self.config['c_params'])])
-        #TODO account for the case when folds exceeds number of samples
+        #do a cross validation for each value of the C param
         for j in range(len(self.config['c_params'])):
             preds = []
             for pred in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
@@ -453,9 +432,9 @@ class nested_cv:
         #retrieve weights from likelihood_params
         if not self.likelihood_params is None and "continuous_target" in self.likelihood_params:
             #transform x and y
-            x, y, w = self.transf_from_probs(x,y)
+            x, y, w = self.transf_from_probs(x, y)
         else:
-            w = ps.Series(np.ones(shape = len(y)) )
+            w = pd.Series(np.ones(shape = len(y)) )
         #determine the k best classifiers
         all_preds.index = y_p.index
         x.columns = x_p.columns
@@ -467,15 +446,19 @@ class nested_cv:
         y_t = y.copy()
         y_t[y_t == 0] = -1
         #compute balanced accuracy, positive and negative recall
+        #balanced accuracy
         baccs = [self.bacc(self.recall_pos(y_p_t, all_preds.iloc[:,j]), self.recall_neg(y_p_t, all_preds.iloc[:,j])) for j in range(len(self.config['c_params']))]
+        #recall of pt positive class
         recps = [self.recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
+        #recall of pt negative class
         recns = [self.recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
+        #sort values of the C params tested according to balanced accuracy achieved
         baccs_s = sorted(((baccs[i], recps[i], recns[i], self.config['c_params'][i]) for i in range(len(self.config['c_params']))), key=itemgetter(0), reverse=True )
         predictors = []
         #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
             no_classifier = 1
-        models = ps.DataFrame(np.zeros(shape=(x.shape[1], k * no_classifier)))
+        models = pd.DataFrame(np.zeros(shape=(x.shape[1], k * no_classifier)))
         models.index = x.columns
         #EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
         #index_vector = (y_t != -1) | (w != 1)
@@ -493,39 +476,41 @@ class nested_cv:
         for i in range(k):
             predictor = svm.LinearSVC(C=baccs_s[i][3])
             predictor.set_params(**self.config["liblinear_params"])
-            #sample A features and B samples if the corresponding options are set
+            #subset the features
             sample_feats = sorted(random.sample(x.columns, int(math.floor(x.shape[1] * self.perc_feats))))
+            #subset the samples
             sample_samples_p = sorted(random.sample(x_p.index, int(math.floor(x_p.shape[0] * self.perc_samples))))
             sample_samples = sorted(random.sample(x.index, int(math.floor(x.shape[0] * self.perc_samples))))
             #train the full model with the k best models
             for l in range(no_classifier):
                 x_sub = x.loc[sample_samples, sample_feats]
                 y_t_sub = y_t.loc[sample_samples]
+                #check if using ancestral phenotype gains and losses and phyletic patterns combined
                 if self.is_phypat_and_rec:
                     x_p_sub = x_p.loc[sample_samples_p, sample_feats]
                     y_p_t_sub = y_p_t.loc[sample_samples_p]
-                    X = ps.concat([x_sub, x_p_sub], axis = 0)
+                    X = pd.concat([x_sub, x_p_sub], axis = 0)
                     #add inverse features if the corresponding option is set
                     if self.inverse_feats:
-                        X = ps.concat([X, 1 - X], axis = 1)
+                        X = pd.concat([X, 1 - X], axis = 1)
                     #normalize if the corresponding option is set
                     if self.do_normalization:
                         X, _ = self.normalize(X)
-                    #predictor.fit(X, ps.concat([y_t, y_p_t], axis = 0), sample_weight = ps.concat([balance_weights(w, y_t), balance_weights(ps.Series(np.ones(shape = len(y_p))), y_p_t)]))
-                    predictor.fit(X, ps.concat([y_t_sub, y_p_t_sub], axis = 0))
+                    #Start EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
+                    #predictor.fit(X, pd.concat([y_t, y_p_t], axis = 0), sample_weight = pd.concat([balance_weights(w, y_t), balance_weights(pd.Series(np.ones(shape = len(y_p))), y_p_t)]))
+                    #END EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
+                    predictor.fit(X, pd.concat([y_t_sub, y_p_t_sub], axis = 0))
                 else:
                     if self.inverse_feats:
                         #add inverse features
-                        x_sub =  ps.concat([x_sub, x_sub], axis = 1)
+                        x_sub =  pd.concat([x_sub, x_sub], axis = 1)
                     #normalize if the corresponding option is set
                     if self.do_normalization:
                         x_sub, _ = self.normalize(x_sub)
                     predictor.fit(x_sub, y_t_sub)
-                    #save the model
                 #add inverse features if the corresponding option is set
                 if self.inverse_feats:
                     print "in inverse features mode"
-                    #collapse extended feature space
                     #discard negative features in first half of the weight vector and negative features in the second half of the weight vector
                     pos_coef = predictor.coef_[0][0:(len(predictor.coef_[0]))/2]
                     pos_coef[pos_coef < 0] = 0
@@ -537,32 +522,32 @@ class nested_cv:
                 predictors.append(predictor)
                 models.loc[sample_feats, i * no_classifier + l] = rel_weights 
             bias_cparams.append((predictor.C, predictor.intercept_[0]))
-        ps.DataFrame(bias_cparams).to_csv("%s/%s_bias.txt"%(self.model_out,pt_out), sep = "\t", index = None, header = None)
+        pd.DataFrame(bias_cparams).to_csv("%s/%s_bias.txt"%(self.model_out,pt_out), sep = "\t", index = None, header = None)
         feats = []
-        #determine the majority features 
-        for i in range(models.shape[0]):
-            #if sum(models.loc[models.index[i],:] != 0) >= math.ceil(k/2.0):
-            if sum(models.loc[models.index[i],:] != 0) > 1:
-                feats.append(models.index[i])
+        #prepare performance statistics
         rownames = [baccs_s[i][3] for i in range(k)] 
         colnames = ['bacc', "pos_rec", "neg_rec"]
-        baccs_s_np = np.array(baccs_s)[0:k,0:3].T
-        baccs_s_np_p = ps.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
-        ps.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
+        baccs_s_np = np.array(baccs_s)[0:k, 0:3].T
+        baccs_s_np_p = pd.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
+        #write them to disk
+        pd.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
+        #determine features with non-zero weights
+        for i in range(models.shape[0]):
+            if sum(models.loc[models.index[i],:] != 0) > 1:
+                feats.append(models.index[i])
         #write all the features with their weights to disk
         rownames_extd = [str(baccs_s[i][3]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
-        models_df = ps.DataFrame(models)
+        models_df = pd.DataFrame(models)
         models_df.columns = rownames_extd
         for i in range(k):
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #get correlation with phenotype for all selected features
         if not len(feats) == 0:
-            import scipy.stats
             cor = x_p.loc[:, feats].apply(lambda x: scipy.stats.pearsonr(x, y_p)[0])
             #write majority features with their weights to disk
-            pf2desc = ps.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
-            feat_df = ps.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], cor], axis = 1)
+            pf2desc = pd.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
+            feat_df = pd.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], cor], axis = 1)
             feat_df.columns = ["description"] + rownames_extd + ["cor"]
             columns_out = rownames_extd + ["description"] + ["cor"]
             feat_df.sort(columns = ["cor"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")

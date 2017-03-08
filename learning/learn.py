@@ -21,6 +21,7 @@ class pt_classification:
 
     
     def setup_folds_synthetic(self, x, folds):
+        """helper method to manipulate the random generator"""
         #short folds length
         f = x / folds
         #number of extended folds
@@ -44,14 +45,11 @@ class pt_classification:
                     c.append(l.strip())
         #parse pure json
         self.config = json.loads("\n".join(c))
-        #random.seed(self.config["seed"])
         #check if we want to do nested cross validation accuracy estimation
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
         self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon)
-        if not os.path.exists(model_out):
-            os.mkdir(model_out)
         #write config to disk
         with open("%s/config.json" % self.model_out, 'w') as out_f:
             json.dump(self.config, out_f, indent=4, separators=(',', ': '))
@@ -61,14 +59,6 @@ class pt_classification:
         #read in phyletic patterns
         p = pd.read_csv(phypat_f, sep = "\t", na_values = ["?"], index_col = 0)
         p.index = p.index.astype('string')
-        #check if this is a new run or if the current run shall be recomputed
-        if self.resume:
-            f = open("%s/cv_acc.txt"%self.model_out, "a")
-        else:
-            f = open("%s/cv_acc.txt"%self.model_out, "w")
-        #create a directory for storing the pickled models
-        if not os.path.exists("%s/pickled"%self.model_out):
-            os.mkdir("%s/pickled"%self.model_out)
         #iterate over all phenotypes
         pf_mapping = pd.read_csv(pf2acc_desc_f, index_col = 0, sep = "\t") 
         pt_mapping = pd.read_csv(pt2acc_f, index_col = 0, sep = "\t")
@@ -82,25 +72,18 @@ class pt_classification:
             random.shuffle(rows)
             x_p = x_p.loc[rows, ]
             y_p = y_p.loc[rows, ]
+            #determine if we should infer ancestral feature gains and losses
             if not rec_dir is None:
-                #if not os.path.exists("%s/pt%s.dat"%(rec_dir, int(pt) + 206):
                 if not os.path.exists("%s/pt%s.dat"%(rec_dir, pt)):
                     print "skipping pt", pt, "no reconstruction matrix found, possibly due to no reconstruction events for this phenotype"
                     continue
-                #a = pd.read_csv("%s/pt%s.dat"%(rec_dir, int(pt) + 206), index_col = 0, sep = "\t", header = None)
                 a = pd.read_csv("%s/pt%s.dat"%(rec_dir, pt), index_col = 0, sep = "\t")
                 a.index = a.index.astype('string')
-                #HACK
-                #treat gains and losses the same
                 #only relevant for the parsimony case
                 if not parsimony_params is None :
                     raise Exception("not yet implemented")
-                #pfid2acc = pd.read_csv("/net/metagenomics/projects/phenotypes_20130523/gideon/mapping/stol_2_NCBI20140115_candidatus/pfam_pts_names_nl_desc.txt" , sep = "\t", header = None)
-
-                #pt = a.shape[1] - 1 
                 a.columns = pf_mapping.index.tolist() + [pt]
-                #a = a.iloc[:,0:(a.shape[1])]
-                #phenotype index in the reconstruction matrix
+                #x annotation, y phenotype table
                 x = a.loc[:, pf_mapping.index]
                 y = a.loc[:, pt]
             else:
@@ -112,21 +95,9 @@ class pt_classification:
                 x_p = (x_p > 0).astype('int')
                 if likelihood_params is None:
                     x = (x > 0).astype('int')
-    
-            #target vector with missing data removed
+            #set phenotype negative class to -1
             y[(y==0)] = -1
-            #if in likelihood reconstruction case set entries of the target vector with likely gain and loss to 1
-            #TODO what about the other entries in x?
-            if not rec_dir is None and not likelihood_params is None:
-                y[(y==2)] = 1
-            #check if we are in likelihood mode and y consists of target probabilities instead of discrete values
-            #TODO sample restrictions don't hold anymore when doubling the data set
-            #TODO all class 0 and class 1 samples are contingiuos in the input, shuffle or make 0,1,0,1
             #skip phenotypes with too little samples
-            #in case of joint phyletic pattern and reconstruction-based classification, sum up observations
-            y_join = y.copy()
-            if is_phypat_and_rec:
-                y_join =  y_join.append(y_p)
             if len(y_p) < self.config['min_samples']:
                 print "skipping pt %s with only %s observations"%(pt_out,len(y_p))
                 continue
@@ -144,9 +115,8 @@ class pt_classification:
                     import traceback
                     print traceback.print_exc(e)
                     print e
-                    print "pt %s has too few samples in one of the classes possibly, due to a high threshold in the likelihood reconstruction; try to lower the number of cross validation fold and run again"
+                    print "pt %s has too few samples in one of the classes possibly, due to a high threshold in the likelihood reconstruction; try to increase the number of cross validation fold and run again"
                     continue
-                #accuracy +1 class
                 all_preds.index = y_p.index
                 y_p_t = y_p.copy()
                 y_p_t[y_p_t == 0] = -1
@@ -166,8 +136,10 @@ class pt_classification:
                 miscl_plus = pd.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
                 #print miscl_plus
                 self.write_miscl(model_out, pt_out, miscl_plus)
-                f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
-                f.flush()
+                #cv accuracy stats
+                with open("%s/cv_acc.txt"%self.model_out, "a") as f:
+                    f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
+                    f.flush()
             all_preds = pd.DataFrame(self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out))
             #temporary hack to the get random generator into place
             folds = self.setup_folds_synthetic(len(x), cv_outer)
@@ -185,7 +157,7 @@ class pt_classification:
             #for i in range(8476 * (10 + 10 + 10 * 10 * (len(self.config['c_params']) + 1)) ):
             #    random.randint(0,9)
             self.ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, self.config['k'], pt_out)
-        f.close()
+
 if __name__=="__main__":
     import argparse
     parser = argparse.ArgumentParser("traitar-model the phenotype classifier")
@@ -211,6 +183,7 @@ if __name__=="__main__":
     parser.add_argument("--cv_inner", type = int, default = None, help = 'the number of folds used for inner cross validation if this option is given nested cross validation will be performed otherwise only feature selection routines will launched') 
     parser.add_argument("--consider_in_recon",  default = [], help = 'list of samples that are only contained with a phyletic pattern but not in the tree') 
     parser.add_argument("--n_jobs", type = int, default = 1, help = "number of jobs that shall be used")
+    #Deprecated parsimony option
     #-a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
     #parsimony_params = None
     #parse likelihood option
@@ -223,9 +196,8 @@ if __name__=="__main__":
         a.consider_in_recon.index = a.consider_in_recon.index.astype('string')
     #parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
     if os.path.exists(a.out) and not a.resume:
-        #sys.stderr.write("output directory %s already exists; delete and rerun\n"%a.out)
-        #sys.exit(1)
-        pass
+        sys.stderr.write("output directory %s already exists; delete and rerun\n"%a.out)
+        sys.exit(1)
     elif not os.path.exists(a.out):
         try:
             os.mkdir(a.out)
