@@ -52,6 +52,7 @@ def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_table, code_di
             args_dict[n] = "%s/%s" % (out_dir, df)    
         else:
             args_dict[n] = m    
+<<<<<<< HEAD
     learn_phypat = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --with_seed --resume"
     cmd_strings = [learn_phypat] 
     #prediction modes

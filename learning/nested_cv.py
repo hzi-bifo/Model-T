@@ -223,6 +223,13 @@ class nested_cv:
                 if self.do_normalization:
                     x_train_sub, scaler = self.normalize(x_train_sub)
                 predictor.fit(x_train_sub, y_train_t_sub)
+                #print "C param", C 
+                #print "bias:", predictor.intercept_[0]
+                #models = ps.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
+                #models.index = x_train_sub.columns
+                #models.iloc[:, 0] = predictor.coef_[0]
+                #models = models.loc[models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1),]
+                #print models
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
                 #add inverse features to test sample
@@ -434,12 +441,18 @@ class nested_cv:
             #transform x and y
             x, y, w = self.transf_from_probs(x, y)
         else:
-            w = pd.Series(np.ones(shape = len(y)) )
+            w = ps.Series(np.ones(shape = len(y)) )
+        #discard non binary phenotype labels in the reconstruction matrix and target matrix
+        if not self.likelihood_params is None:
+            t = float(self.likelihood_params["threshold"])
+            condition = ~((y != -1) & (y < t))
+            y = y.loc[condition]
+            x = x.loc[condition, :]
         #determine the k best classifiers
         all_preds.index = y_p.index
         x.columns = x_p.columns
         y.index = x.index
-        w.index = x.index
+        #w.index = x.index
         y_p_t = y_p.copy()
         #make sure the negative class label -1 instead of 0
         y_p_t[y_p_t == 0] = -1

@@ -24,14 +24,16 @@ def prune_ncbi_tree(full_tree_fn, ncbi_ids_fn, format_out, outfile, newick_exten
     if resolve_polytomy:
         t.resolve_polytomy(recursive = True)
     if do_name_internal:
-        n = 1
+        n = 2
         t.rank = "bacteria"
-        for node in t.traverse():
+        for node in t.traverse(strategy = 'preorder'):
+            if node.is_root():
+                node.name = "N1"  
             #if node.name in tax_ids:
             #    node.children = []
-                if not node.is_leaf():
-                   node.name = "N%s" %n
-                   n += 1
+            elif not node.is_leaf():
+               node.name = "N%s" %n
+               n += 1
     if newick_extended:
         t.write(features = ["name", "scientific_name", "rank"], outfile=outfile, format=format_out)
     else:
