@@ -30,6 +30,7 @@ def merge_data(annotation, phenotypes, out_dir):
     #create dummy ids mapping
     ids_map = pd.DataFrame(m.index, index = m.index) 
     ids_map.to_csv("{}/ids2name.txt".format(out_dir),  sep = '\t')
+    return pheno_m
 
 if __name__ == "__main__":
     import argparse
