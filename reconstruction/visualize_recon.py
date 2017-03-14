@@ -43,28 +43,7 @@ def get_style():
     ts = TreeStyle()
     # Do not add leaf names automatically
     ts.show_leaf_name = False
-    ts.show_scale = False
-    ts.force_topology = True
-    # Use my custom layout
-    ts.layout_fn = my_layout
-    return ts
-
-def my_layout(node):
-    if node.is_leaf():
-         # If terminal node, draws its name
-         name_face = AttrFace("name")
-    else:
-         # If internal node, draws label with smaller font size
-         name_face = AttrFace("name", fsize=10)
-    # Adds the name face to the image at the preferred position
-    faces.add_face_to_node(name_face, node, column=0, position="branch-right")
-    
-
-def get_style():
-    ts = TreeStyle()
-    # Do not add leaf names automatically
-    ts.show_leaf_name = False
-    ts.show_scale = False
+    ts.show_scale = True 
     ts.force_topology = True
     # Use my custom layout
     ts.layout_fn = my_layout
@@ -85,20 +64,20 @@ def plot_legend(feats, out, pf2color,  pf_desc = False, pf_acc = True, include_c
     ax = fig.add_subplot(111)
     x = [0,1]
     lines = [ax.plot(x, pd.np.ones(len(x)), 'o', color = "#%06x" % (pf2color[feats.index[i]]))[0] for i in range(feats.shape[0])]
-    labels= ["%s" %(feats.loc[:,"Pfam_acc"].iloc[i]) for i in range(feats.shape[0])]
-    if include_class:
-        labels= ["%s %s" %(labels[i], feats.loc[:, "class"].iloc[i]) for i in range(len(labels))]
-    if pf_desc:
-        labels = ["%s %s" % (labels[i], pf2short_desc.loc[feats.loc[:,"Pfam_acc"].iloc[i], 1]) for i in range(len(labels))]
-    if pf_acc:
-        labels = ["%s %s" % (labels[i], pf2acc.loc[feats.loc[:,"Pfam_acc"].iloc[i], 1]) for i in range(len(labels))]
+    #labels= ["%s" %(feats.loc[:,"Pfam_acc"].iloc[i]) for i in range(feats.shape[0])]
+    labels= [i for i in feats.index]
+    #if include_class:
+    #    labels= ["%s %s" %(labels[i], feats.loc[:, "class"].iloc[i]) for i in range(len(labels))]
+    #if pf_desc:
+    #    labels = ["%s %s" % (labels[i], pf2short_desc.loc[feats.loc[:,"Pfam_acc"].iloc[i], 1]) for i in range(len(labels))]
+    #if pf_acc:
+    #    labels = ["%s %s" % (labels[i], pf2acc.loc[feats.loc[:,"Pfam_acc"].iloc[i], 1]) for i in range(len(labels))]
 
     figlegend.legend(lines, labels, markerscale = 2.5, numpoints = 1, frameon = False)
     #fig.show()
     fig.tight_layout()
     figlegend.savefig(out + "_legend.svg")
     figlegend.savefig(out + "_legend.png")
-    pf2short_desc.loc[feats.loc[:,"Pfam_acc",] ].to_csv(out + '_feats.txt', bbox_inches='tight', sep = "\t", header = None)
     return figlegend
 
 def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, feat_list, sample_mapping, threshold = 0.5, target_node = None):
@@ -131,43 +110,46 @@ def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, 
             style['fgcolor'] = 'darkred'
         else:
             style['fgcolor'] = 'green'
-        #if not n.name == "N1":
-        #    branch_id = n.name + "_" + n.up.name
-        #    print gain_recon.loc[branch_id, phenotype], loss_recon.loc[branch_id, phenotype]
-        #    if gain_recon.loc[branch_id, phenotype] > threshold:
-        #        style["hz_line_type"] = 1
-        #    elif loss_recon.loc[branch_id, phenotype] > threshold:
-        #        style["hz_line_type"] = 1
-        #        style["hz_line_color"] = 'red'
-        #        style["hz_line_width"] = 3
-        #    else:
-        #        style["hz_line_type"] = 0
-        #        style["hz_line_color"] = 'black'
-        n.set_style(style)
-        #    #set species name instead of tax id
-        #    if n.name in sample_mapping.index:
-        #        node2name[n.name] = sample_mapping.loc[n.name,][0]
-        #    #add majority feature gains and losses
-        #    events = []
-        #    for i in range(top10_feats.shape[0]): 
-        #        cf = faces.CircleFace(radius = 8, style = "circle", color = kelly_colors_hex[i])
-        #        pfam2color[top10_feats.index[i]] = kelly_colors_hex[i]
-        #        #gain events
-        #        if gain_recon.loc[branch_id, top10_feats.index[i]] > threshold:
-        #            pfam2color[top10_feats.index[i]] = kelly_colors_hex[i]
-        #            tf = faces.TextFace("-")
-        #            events.append(tf)
-        #            pfams_with_event.add(node_recon.index[i])
-        #            events.append(cf)
-        #        #loss events
-        #        elif loss_recon.loc[branch_id, top10_feats.index[i]] > threshold:
-        #            pfam2color[top10_feats.index[i]] = kelly_colors_hex[i]
-        #            tf = faces.TextFace("+")
-        #            events.append(tf)
-        #            pfams_with_event.add(node_recon.index[i])
-        #            events.append(cf)
-        #    for i in range(len(events)):
-        #        n.add_face(events[i], column = i, position = "branch-top")
+        if not n.name == "N1":
+            branch_id = n.name + "_" + n.up.name
+            #print gain_recon.loc[branch_id, phenotype], loss_recon.loc[branch_id, phenotype]
+            if gain_recon.loc[branch_id, phenotype] > threshold:
+                style["hz_line_type"] = 1
+                style["hz_line_color"] = 'green' 
+                style["hz_line_width"] = 3
+            elif loss_recon.loc[branch_id, phenotype] > threshold:
+                style["hz_line_type"] = 1
+                style["hz_line_color"] = 'red'
+                style["hz_line_width"] = 3
+            else:
+                style["hz_line_type"] = 0
+                style["hz_line_color"] = 'black'
+            n.set_style(style)
+            #set species name instead of tax id
+            if n.name in sample_mapping.index:
+                node2name[n.name] = sample_mapping.loc[n.name,][0]
+            #add majority feature gains and losses
+            events = []
+            for i in range(top10_feats.shape[0]): 
+                cf = faces.CircleFace(radius = 8, style = "circle", color = kelly_colors_hex[i])
+                pfam2color[top10_feats.index[i]] = kelly_colors_hex[i]
+                #gain events
+                #print gain_recon.columns
+                if gain_recon.loc[branch_id, top10_feats.index[i]] > threshold:
+                    pfam2color[top10_feats.index[i]] = kelly_colors_hex[i]
+                    tf = faces.TextFace("+")
+                    events.append(tf)
+                    pfams_with_event.add(node_recon.index[i])
+                    events.append(cf)
+                #loss events
+                elif loss_recon.loc[branch_id, top10_feats.index[i]] > threshold:
+                    pfam2color[top10_feats.index[i]] = kelly_colors_hex[i]
+                    tf = faces.TextFace("-")
+                    events.append(tf)
+                    pfams_with_event.add(node_recon.index[i])
+                    events.append(cf)
+            for i in range(len(events)):
+                n.add_face(events[i], column = i, position = "branch-top")
     for n in pt_tree.traverse():
         if n.name in node2name:
             n.name = node2name[n.name]
@@ -197,3 +179,4 @@ if __name__ == "__main__":
     a = parser.parse_args()
     pt_tree, feats, pf2color = get_tree(node_recon = a.node_recon, gain_recon = a.gain_recon, loss_recon = a.loss_recon, pfam_mapping = a.pfam_mapping, tree = a.tree, feat_list = a.feat_list, phenotype = a.phenotype, target_node = a.target_node, threshold = a.threshold, sample_mapping = a.sample_mapping)
     plot_tree(pt_tree, a.target_node, a.out)
+    plot_legend(feats, a.out, pf2color) 
