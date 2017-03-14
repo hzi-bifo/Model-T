@@ -223,13 +223,13 @@ class nested_cv:
                 if self.do_normalization:
                     x_train_sub, scaler = self.normalize(x_train_sub)
                 predictor.fit(x_train_sub, y_train_t_sub)
-                print "C param", C 
-                print "bias:", predictor.intercept_[0]
-                models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
-                models.index = x_train_sub.columns
-                models.iloc[:, 0] = predictor.coef_[0]
-                models = models.loc[models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1),]
-                print models
+                #print "C param", C 
+                #print "bias:", predictor.intercept_[0]
+                #models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
+                #models.index = x_train_sub.columns
+                #models.iloc[:, 0] = predictor.coef_[0]
+                #models = models.loc[models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1),]
+                #print models
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
                 #add inverse features to test sample

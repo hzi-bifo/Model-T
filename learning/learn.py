@@ -16,6 +16,7 @@ class pt_classification:
     def write_miscl(self, model_out, pt_out, miscl_plus):
         """map the misclassified sample ids to their scientific names and taxonomic ids"""
         miscl_m = pd.read_csv(self.config["phyn_f"], sep = "\t", index_col = 0)
+        miscl_plus.index = miscl_plus.index.astype('string')
         miscl_m.index = miscl_m.index.astype('string')
         pd.concat([miscl_plus, miscl_m.loc[miscl_plus.index,]], axis = 1).to_csv("%s/%s_miscl.txt"%(model_out, pt_out), sep = "\t")
 
@@ -107,7 +108,7 @@ class pt_classification:
             if sum(y_p <=0) < self.config['min_neg']:
                 print "skipping pt %s with only %s - observations"%(pt_out,sum(y_p<=0))
                 continue
-            print "pt_out", pt, "with", sum(y_p>0), "positive samples and", sum(y_p<=0), "negative samples"
+            print "running phenotype", pt, "with", sum(y_p>0), "phenotype-positive samples and", sum(y_p<=0), "phenotype-negative samples"
             if not cv_inner is None:
                 try:
                     all_preds = pd.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
