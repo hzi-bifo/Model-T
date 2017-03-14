@@ -1,6 +1,13 @@
 import pandas as pd
 def merge_data(annotation, phenotypes, out_dir):
-    annot_m = pd.read_csv(annotation, index_col = 0, sep = "\t")
+    #read in annotation from potentially different sources
+    annots = [pd.read_csv(annot, index_col = 0, sep = "\t") for annot in annotation]
+    #find samples common to all annotation tables
+    common_ids = set(annots[0].index.tolist())
+    for annot in annots:
+        common_ids = common_ids.intersection(set(annot.index.tolist()))
+    common_ids = list(common_ids)
+    annot_m = pd.concat([annot.loc[common_ids, ] for annot in annots], axis = 1)
     pheno_m = pd.read_csv(phenotypes, index_col = 0, sep = "\t")
     is_in_annot_index = [i in pheno_m.index for i in annot_m.index]
     is_in_pheno_index = [i in annot_m.index for i in pheno_m.index]
@@ -30,12 +37,13 @@ def merge_data(annotation, phenotypes, out_dir):
     #create dummy ids mapping
     ids_map = pd.DataFrame(m.index, index = m.index) 
     ids_map.to_csv("{}/ids2name.txt".format(out_dir),  sep = '\t')
+    return pheno_m
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser("learn antibiotic resistance models")
-    parser.add_argument("annotation", help= 'target')
-    parser.add_argument("phenotypes", help= 'target')
+    parser.add_argument("annotation", help= 'annotation table', nargs='+')
+    parser.add_argument("phenotypes", help= 'phenotype table')
     parser.add_argument("out_dir", help= 'target')
     args = parser.parse_args()
     merge_data(**vars(args))
