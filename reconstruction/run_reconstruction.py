@@ -15,13 +15,13 @@ def loop(parts, cmd_strings, args_dict, fns, out_dir, jobs, cpus):
     for fn in fns:
         sys.stdout.write("cat %s/%s | parallel -j %s\n" % (out_dir, fn, cpus))
 
-def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_table, code_dir, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, do_phypat_only, cpus, anno_type):
+def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_tables, code_dir, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, do_phypat_only, cpus, anno_type, do_normalization):
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
     #merge_str = "python %(code_dir)s/reconstruction/merge_annot_and_pt.py %(annotation_table)s %(phenotype_table)s %(out_dir)s"
     #merge annotation/features and phenotype data
-    pts = merge_annot_and_pt.merge_data(annotation_table, phenotype_table, out_dir).index.tolist()
-    args_dict = {"tree_unpruned" : tree_unpruned, "out_dir" : out_dir, "features" : "feats.txt", "phenotypes" : "phenotypes.txt" , "annotation_table" : annotation_table, "parts": parts, "code_dir" : code_dir, "phenotype_table" : phenotype_table, "anno_type": anno_type} 
+    pts = merge_annot_and_pt.merge_data(annotation_tables, phenotype_table, out_dir).index.tolist()
+    args_dict = {"tree_unpruned" : tree_unpruned, "out_dir" : out_dir, "features" : "feats.txt", "phenotypes" : "phenotypes.txt" , "parts": parts, "code_dir" : code_dir, "phenotype_table" : phenotype_table, "anno_type": anno_type} 
     pts = pd.read_csv("%s/phenotypes.txt" % out_dir, index_col = 0).index.tolist()
     if not do_phypat_only:
         prune_str = "python %(code_dir)s/reconstruction/prune_ncbi_tree.py %(tree_unpruned)s --ncbi_ids %(out_dir)s/ids.txt %(out_dir)s/tree_named.tre --do_name_internal --resolve_polytomy"
@@ -52,7 +52,11 @@ def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_table, code_di
             args_dict[n] = "%s/%s" % (out_dir, df)    
         else:
             args_dict[n] = m    
-    learn_phypat = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --with_seed --resume"
+    if do_normalization:
+        args_dict['do_normalization'] = '--do_normalization'
+    else:
+        args_dict['do_normalization'] = ''
+    learn_phypat = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --with_seed --resume %(do_normalization)s"
     cmd_strings = [learn_phypat] 
     #prediction modes
     modes = ["phypat"]
@@ -65,7 +69,7 @@ def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_table, code_di
         cmd_strings.append(learn_pgl)
     if do_nested_cv:
         #add nested cv parameter
-        cmd_strings = [i + " --inner_cv 10" for i in cmd_strings]
+        cmd_strings = [i + " --cv_inner 10" for i in cmd_strings]
     loop(pts, cmd_strings, args_dict, fns, out_dir, range(parts), cpus)
     #TODO include traitar new
     model_names = ["%s" % i for i in modes] 
@@ -88,12 +92,13 @@ if __name__ == "__main__":
     parser.add_argument("phenotype_table", help='phenotype table for all samples')
     parser.add_argument("--phenotype_mapping", help='')
     parser.add_argument("--feature_mapping", help='use given mapping of features to names')
-    parser.add_argument("annotation_table", help='annotation table for all samples (e.g. Traitar output)')
+    parser.add_argument("annotation_tables", help='annotation table for all samples (e.g. Traitar output)', nargs = '+' )
     parser.add_argument("--sample_mapping", help='use given mapping of samples to names e.g. strain designations')
     parser.add_argument("code_dir", help='traitar-model code directory')
     parser.add_argument("--do_nested_cv", action = 'store_true', help='do ten-fold nested cross validation rather than only simple 10-fold cross-validation')
     parser.add_argument("--cpus", type = int, help='number of cpus to be used', default = 1)
     parser.add_argument("--do_phypat_only", action = 'store_true', help='only use phyletic patterns for classification')
     parser.add_argument("--anno_type", choices = {"pfam", "cazy"}, default = None,  help='choose between pfam, cazy if annotation data hmm-based')
+    parser.add_argument("--do_normalization", action = "store_true",  help='use if using non-binary, continuous input features such as gene expression')
     args = parser.parse_args()
     reconstruction_cmds(**vars(args))

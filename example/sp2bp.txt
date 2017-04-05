@@ -109,14 +109,12 @@
 537012	Bacteroides cellulosilyticus DSM 14838
 557760	Rhodobacter sphaeroides KD131
 56780	Syntrophus aciditrophicus SB
-573061	Clostridium cellulovorans 743B (Prj:52819)
 573061	Clostridium cellulovorans 743B
 573064	Methanocaldococcus fervens AG86
 588581	Clostridium papyrosolvens DSM 2782
 590998	Cellulomonas fimi ATCC 484
 591167	Streptomyces flavogriseus ATCC 33331
 59374	Fibrobacter succinogenes subsp. succinogenes S85
-59374	Fibrobacter succinogenes subsp. succinogenes S85 (Prj:47)
 598659	Nautilia profundicola AmH
 608506	Caldicellulosiruptor obsidiansis OB47
 62928	Azoarcus sp. BH72
@@ -133,6 +131,16 @@
 649349	Leadbetterella byssophila DSM 17132
 665571	Spirochaeta thermophila DSM 6192
 697329	Ruminococcus albus 7
-697329	Ruminococcus albus 7 = DSM 20455
 744872	Treponema caldaria DSM 7334
 87626	Pseudoalteromonas tunicata D2
+1122176	Lewinella cohaerens DSM 23179
+1122179	Lewinella persica DSM 23188
+385957	Amycolatopsis sp. ATCC 39116
+471856	Jonesia denitrificans DSM 20603
+479430	Actinospica robiniae DSM 44927
+479433	Catenulispora acidiphila DSM 44928
+593907	Cellulomonas gilvus ATCC 13127
+665577	Streptomyces viridosporus T7A
+720554	[Clostridium] clariflavum DSM 19732
+869211	Spirochaeta thermophila DSM 6578
+979226	Cohnella panacarvi Gsoil 349
