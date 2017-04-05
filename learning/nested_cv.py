@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import sklearn.svm as svm
+from sklearn import tree 
 from joblib import Parallel, delayed, load, dump
 #TODO use the sklearn version of joblib instead to remove the direct joblib dependency
 from operator import itemgetter
@@ -177,6 +178,7 @@ class nested_cv:
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
             no_classifier = 1
         all_preds = pd.DataFrame(np.zeros(shape = (x_test.shape[0], no_classifier)))
+        all_scores = pd.DataFrame(np.zeros(shape = (x_test.shape[0], no_classifier)))
         for i in range(no_classifier):
             #select a subset of features for classification
             sample_feats = sorted(random.sample(x_train.columns, int(math.floor(x_train.shape[1] * self.perc_feats))))
@@ -223,13 +225,13 @@ class nested_cv:
                 if self.do_normalization:
                     x_train_sub, scaler = self.normalize(x_train_sub)
                 predictor.fit(x_train_sub, y_train_t_sub)
-                print "C param", C 
-                print "bias:", predictor.intercept_[0]
-                models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
-                models.index = x_train_sub.columns
-                models.iloc[:, 0] = predictor.coef_[0]
-                models = models.loc[models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1),]
-                print models
+                #print "C param", C 
+                #print "bias:", predictor.intercept_[0]
+                #models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
+                #models.index = x_train_sub.columns
+                #models.iloc[:, 0] = predictor.coef_[0]
+                #models = models.loc[models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1),]
+                #print models
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
                 #add inverse features to test sample
@@ -237,6 +239,7 @@ class nested_cv:
             if self.do_normalization:
                 x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
+            all_scores.iloc[:, i]  = predictor.decision_function(x_test_sample)
         #do majority vote to aggregate predictions
         aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
         return aggr_preds 
@@ -397,7 +400,7 @@ class nested_cv:
                 all_preds.index = yp_train.index
                 #do inner cross validation
                 preds = []
-                for pred in Parallel(n_jobs=self.n_jobs)(delayed(self.cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, self.config['c_params'][j])
+                for pred, _ in Parallel(n_jobs=self.n_jobs)(delayed(self.cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, self.config['c_params'][j])
                         for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
                             in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(self.config['c_params'])))):
                     preds.append(list(pred))
@@ -421,14 +424,18 @@ class nested_cv:
         folds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
         #store predictions for each fold in all_preds
         all_preds = np.zeros(shape=[len(y_p), len(self.config['c_params'])])
+        all_scores = np.zeros(shape=[len(y_p), len(self.config['c_params'])])
         #do a cross validation for each value of the C param
         for j in range(len(self.config['c_params'])):
             preds = []
-            for pred in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
+            scores = []
+            for pred, scores in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
                     for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
                 preds += list(pred)
+                scores += list(scores)
             all_preds[:,j] = preds
-        return all_preds
+            all_scores[:,j] = scores 
+        return all_preds, all_scores
         
         
     def majority_feat_sel(self, x, y, x_p, y_p, all_preds, k, pt_out, no_classifier = 10):
@@ -517,7 +524,7 @@ class nested_cv:
                     if self.inverse_feats:
                         #add inverse features
                         x_sub =  pd.concat([x_sub, x_sub], axis = 1)
-                    #normalize if the corresponding option is set
+                    #normalize if , reduce = Truethe corresponding option is set
                     if self.do_normalization:
                         x_sub, _ = self.normalize(x_sub)
                     predictor.fit(x_sub, y_t_sub)
@@ -555,15 +562,24 @@ class nested_cv:
         for i in range(k):
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
-        #get correlation with phenotype for all selected features
+        #get baseline classification models for each individual feature
         if not len(feats) == 0:
-            cor = x_p.loc[:, feats].apply(lambda x: scipy.stats.pearsonr(x, y_p)[0])
+            #initiate, fit and predict with decision stump for each feature
+            preds = [tree.DecisionTreeClassifier().fit(pd.DataFrame(x_p.loc[:, i]), y_p).predict(pd.DataFrame(x_p.loc[:, i])) for i in feats] 
+            #get confusion matrix
+            conf_per_feat = pd.DataFrame([self.confusion_m(y_p, pd.Series(p, index = y_p.index).T) for p in preds ]) 
+            conf_per_feat.index = feats 
+            conf_per_feat.columns = ["TP", "FP", "FN", "TN"]
+            #get macro accuracy
+            bacc = conf_per_feat.apply(lambda x: self.bacc(self.recall_pos_conf(x), self.recall_neg_conf(x)), axis = 1)
+            perf_per_feat = pd.concat([conf_per_feat.iloc[:, [1,2]], bacc], 1)
+            perf_per_feat.columns = ["FP", "FN", "MACC"]
             #write majority features with their weights to disk
             pf2desc = pd.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
-            feat_df = pd.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], cor], axis = 1)
-            feat_df.columns = ["description"] + rownames_extd + ["cor"]
-            columns_out = rownames_extd + ["description"] + ["cor"]
-            feat_df.sort(columns = ["cor"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+            feat_df = pd.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], perf_per_feat], axis = 1)
+            feat_df.columns = ["description"] + rownames_extd + ["FP", "FN", "MACC"]
+            columns_out = rownames_extd + ["description"] + ["FP", "FN", "MACC"]
+            feat_df.sort(columns = ["MACC"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
         #put column names
         #pickle the predictors
         #dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
