@@ -223,6 +223,14 @@ class nested_cv:
                 if self.do_normalization:
                     x_train_sub, scaler = self.normalize(x_train_sub)
                 predictor.fit(x_train_sub, y_train_t_sub)
+                #if learning from gene gains and losses, get selected feature and rebuild model based on phyletic patterns
+                models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
+                models.index = x_train_sub.columns
+                models.iloc[:, 0] = predictor.coef_[0]
+                xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
+                xp_train_sub_t = xp_train_sub.copy()
+                xp_train_sub_t.loc[:, ~models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
+                predictor.fit(xp_train_sub_t, yp_train_t_sub)
                 #print "C param", C 
                 #print "bias:", predictor.intercept_[0]
                 #models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
