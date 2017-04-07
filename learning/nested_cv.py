@@ -242,7 +242,7 @@ class nested_cv:
             all_scores.iloc[:, i]  = predictor.decision_function(x_test_sample)
         #do majority vote to aggregate predictions
         aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
-        return aggr_preds 
+        return aggr_preds, all_scores 
     
     def get_training_and_testing_mapping(self, train_pt_edges, all_pt_edges):
         """map phenotype edges that are not in the full reconstruction and thus must have been joined"""
@@ -415,9 +415,9 @@ class nested_cv:
                 baccs = [self.bacc(self.recall_pos(yp_t_t, all_preds.iloc[:,j]), self.recall_neg(yp_t_t, all_preds.iloc[:,j])) for j in range(len(self.config['c_params']))]
                 print baccs, "baccs"
                 c_opt = self.config['c_params'][np.argmax(np.array(baccs))]
-                print c_opt
+                print c_opt, "optimal value of the C param is this fold"
                 #use that C param to train a classifier to predict the left out samples in the outer cv
-                p = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10)
+                p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10)
                 ocv_preds += list(p)
             return ocv_preds
         
@@ -429,10 +429,10 @@ class nested_cv:
         for j in range(len(self.config['c_params'])):
             preds = []
             scores = []
-            for pred, scores in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
+            for pred, score in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
                     for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
                 preds += list(pred)
-                scores += list(scores)
+                scores += list(score[0])
             all_preds[:,j] = preds
             all_scores[:,j] = scores 
         return all_preds, all_scores
