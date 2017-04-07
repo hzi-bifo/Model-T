@@ -111,7 +111,7 @@ class pt_classification:
             print "running phenotype", pt, "with", sum(y_p>0), "phenotype-positive samples and", sum(y_p<=0), "phenotype-negative samples"
             if not cv_inner is None:
                 try:
-                    all_preds = pd.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
+                    all_preds  = pd.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
                 except ValueError as e:
                     import traceback
                     print traceback.print_exc(e)
@@ -141,7 +141,9 @@ class pt_classification:
                 with open("%s/cv_acc.txt"%self.model_out, "a") as f:
                     f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
                     f.flush()
-            all_preds = pd.DataFrame(self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out))
+            all_preds, all_scores  = self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out)
+            all_preds = pd.DataFrame(all_preds)
+            all_scores = pd.DataFrame(all_scores)
             #temporary hack to the get random generator into place
             folds = self.setup_folds_synthetic(len(x), cv_outer)
             #folds_inner = self.setup_folds_synthetic(folds[1], 10)
