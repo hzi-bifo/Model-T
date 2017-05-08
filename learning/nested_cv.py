@@ -46,7 +46,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon):
+    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -62,6 +62,7 @@ class nested_cv:
         self.resume = resume
         self.pf2desc_f = pf2desc_f
         self.consider_in_recon = consider_in_recon
+        self.is_discrete_phenotype_with_continuous_features  = is_discrete_phenotype_with_continuous_features
 
     def transf_from_probs(self, x, y):
         """create a series of sample specific weights according to the probabilities"""
@@ -160,6 +161,7 @@ class nested_cv:
     
     def cv(self, x_train, y_train, xp_train, yp_train, x_test , C, no_classifier = 10):
         """train model on given training features and target and return the predicted labels for the left out samples"""
+        print y_train, yp_train
         if not self.likelihood_params is None and "continuous_target" in self.likelihood_params:
             #transform x and y
             x_train, y_train, w = self.transf_from_probs(x_train, y_train, self.likelihood_params)
@@ -223,7 +225,9 @@ class nested_cv:
                     #add inverse features
                     x_train_sub = pd.concat([x_train_sub, 1 - x_train_sub], axis = 1) 
                 if self.do_normalization:
-                    x_train_sub, scaler = self.normalize(x_train_sub)
+                    #x_train_sub, scaler = self.normalize(x_train_sub.abs())
+                    x_train_sub = x_train_sub.abs()
+                    pass
                 predictor.fit(x_train_sub, y_train_t_sub)
                 #if learning from gene gains and losses, get selected feature and rebuild model based on phyletic patterns
                 models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
@@ -245,7 +249,9 @@ class nested_cv:
                 #add inverse features to test sample
                 x_test_sample = pd.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
             if self.do_normalization:
-                x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
+                #x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
+                x_test_sample = x_test_sample.abs()
+                pass
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
             all_scores.iloc[:, i]  = predictor.decision_function(x_test_sample)
         #do majority vote to aggregate predictions
@@ -277,16 +283,22 @@ class nested_cv:
         for e in train2all:
             #aggregate rows by summing up
             if not self.likelihood_params is None:
+                #if features have been discretized before just sum over the values of the branches
                 if not 'gt_probs' in self.likelihood_params:
                     cs = x_r.loc[train2all[e], :].sum(axis=0)
                     df = pd.concat([df, cs], axis = 1)
+                #in case of continuous features sum over the branches (the feature value of a branch represents the difference of the reconstructed value of the feature for the start and the end node of that branch)
+                elif self.is_phenotype_and_continuous_features:
+                    cs = np.zeros(shape = x_r.shape[1])
+                    cs = cs + x_r.loc[train2all[e], :].iloc[i, :]
+                    df = pd.concat([df, pd.Series(cs)], axis = 1)
+                #sum up the probabilities
                 else:
-                    #sum up the probabilities
                     cs = np.zeros(shape = x_r.shape[1])
                     for i in range(x_r.loc[train2all[e], :].shape[0]):
                         #print "before aggregation", cs 
                         #print "being aggregated", x_r.loc[train2all[e], :].iloc[i, :]
-                        cs = cs + (1 - cs) * x_r.loc[train2all[e], :].iloc[i, :]
+                         cs = cs + (1 - cs) * x_r.loc[train2all[e], :].iloc[i, :]
                         #print "after aggregation", cs
                     df = pd.concat([df, pd.Series(cs)], axis = 1)
             else: 
@@ -448,6 +460,7 @@ class nested_cv:
         
     def majority_feat_sel(self, x, y, x_p, y_p, all_preds, k, pt_out, no_classifier = 10):
         """determine the features occuring in the majority of the k best models"""
+        print all_preds
         #sanity check if number of classifiers selected for majority feature selection exceeds the number of c params
         if k > len(self.config['c_params']):
             sys.exit("number of selected classifiers for feature selection (%s) exceeds the number of c params (%s)" %(k, len(self.config['c_params'])))
@@ -524,6 +537,7 @@ class nested_cv:
                     #normalize if the corresponding option is set
                     if self.do_normalization:
                         X, _ = self.normalize(X)
+                        pass
                     #Start EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
                     #predictor.fit(X, pd.concat([y_t, y_p_t], axis = 0), sample_weight = pd.concat([balance_weights(w, y_t), balance_weights(pd.Series(np.ones(shape = len(y_p))), y_p_t)]))
                     #END EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
@@ -534,7 +548,9 @@ class nested_cv:
                         x_sub =  pd.concat([x_sub, x_sub], axis = 1)
                     #normalize if , reduce = Truethe corresponding option is set
                     if self.do_normalization:
-                        x_sub, _ = self.normalize(x_sub)
+                        #x_sub, _ = self.normalize(x_sub)
+                        x_sub = x_sub.abs()
+                        pass
                     predictor.fit(x_sub, y_t_sub)
                 #add inverse features if the corresponding option is set
                 if self.inverse_feats:
@@ -573,22 +589,20 @@ class nested_cv:
         #get baseline classification models for each individual feature
         if not len(feats) == 0:
             #initiate, fit and predict with decision stump for each feature
-            preds = [tree.DecisionTreeClassifier().fit(pd.DataFrame(x_p.loc[:, i]), y_p).predict(pd.DataFrame(x_p.loc[:, i])) for i in feats] 
+            x_p = x_p.abs()
+            preds = [tree.DecisionTreeClassifier(max_depth = 1, class_weight = 'balanced').fit(pd.DataFrame(x_p.loc[:, i]), y_p).predict(pd.DataFrame(x_p.loc[:, i])) for i in feats]
             #get confusion matrix
-            conf_per_feat = pd.DataFrame([self.confusion_m(y_p, pd.Series(p, index = y_p.index).T) for p in preds ]) 
+            conf_per_feat = pd.DataFrame([self.confusion_m(y_p_t, pd.Series(p, index = y_p.index).T) for p in preds ]) 
             conf_per_feat.index = feats 
-            conf_per_feat.columns = ["TP", "FP", "FN", "TN"]
+            conf_per_feat.columns = ["TN", "FP", "FN", "TP"]
             #get macro accuracy
             bacc = conf_per_feat.apply(lambda x: self.bacc(self.recall_pos_conf(x), self.recall_neg_conf(x)), axis = 1)
-            perf_per_feat = pd.concat([conf_per_feat.iloc[:, [1,2]], bacc], 1)
-            perf_per_feat.columns = ["FP", "FN", "MACC"]
+            perf_per_feat = pd.concat([conf_per_feat, bacc], 1)
+            perf_per_feat.columns = ["TN", "FP", "FN", "TP"] + ["MACC"]
             #write majority features with their weights to disk
             pf2desc = pd.read_csv(self.pf2desc_f, sep = "\t", index_col = 0).iloc[:, 0]
             feat_df = pd.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], perf_per_feat], axis = 1)
-            feat_df.columns = ["description"] + rownames_extd + ["FP", "FN", "MACC"]
-            columns_out = rownames_extd + ["description"] + ["FP", "FN", "MACC"]
+            feat_df.columns = ["description"] + rownames_extd + ["TN", "FP", "FN", "TP", "MACC"]
+            columns_out = rownames_extd + ["description"] + ["TN", "FP", "FN", "TP", "MACC"]
             feat_df.sort(columns = ["MACC"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
-        #put column names
-        #pickle the predictors
-        #dump(predictors, '%s/pickled/%s_predictors.pkl'%(self.model_out,pt_out))
     
