@@ -24,7 +24,7 @@ def single_matrix(m, pt,  t,  outdir, discretize_pt_only = False):
     m.to_csv(os.path.join(outdir, "pt%s_pruned.dat"%pt), sep="\t")
     return m
 
-def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only = False,  is_internal = False):
+def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only = False,  is_internal = False, are_continuous_features = False):
     """discretize one or combine two matrices into one discretized matrix"""
     if not os.path.exists(outdir):
         #if script is run in parallel the directory might have been created already
@@ -62,7 +62,15 @@ def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only 
             print "processing file %s/pt%s.dat"%(loss_dir2, pt)
             #drop condition for m1 where the pt is non-zero but does not exceed the threshold
             #join gains and losses
-            m = m1 + (1 - m1) * m2 
+            if are_continuous_features:
+                print "hier"
+                m = m1
+                #join phenotype probabilities by counter probabilities p1 + (1- p1) * p2
+                m.loc[:, pt] = m1.loc[:, pt] + (1 - m1.loc[:, pt]) * m2 .loc[:, pt]
+            #if features are probabilities join by counter probabilities p1 + (1- p1) * p2
+            else:
+                m = m1 + (1 - m1) * m2 
+            #if features are continuous sum continuous features
             drop_m = ~((m.iloc[:,m.shape[1] - 1] != 0) & (m.iloc[:,m.shape[1] - 1] < t)) 
             #drop condition for m2
             #set all elements greater or equal the threshold to 1
@@ -102,7 +110,8 @@ if __name__=="__main__":
     parser.add_argument("--in_dir_2", default = None, help='<optional second directory> with gain or loss likelihood matrices that shall be combined with those given in the input dir specified by the <in_dir> option')
     parser.add_argument("--threshold", default = 0.5,  help="threshold to discretize the likelihood matrices i.e. transform them into actual reconstruction events i.e. m [ m > threshold ] = 1 ; m [ m < threshold] = 0" )
     parser.add_argument("--discretize_pt_only", help='if option set discretize phenotypes only', action = "store_true")
+    parser.add_argument("--are_continuous_features", help='set option if features are continuous', action = "store_true")
     a = parser.parse_args()
     #read in phenotype list
     pts = pd.read_csv(a.phenotypes, sep = "\t", index_col = 0).index.astype('string')
-    threshold_matrix(a.in_dir, a.threshold, a.out_dir, pts, a.in_dir_2, a.discretize_pt_only)
+    threshold_matrix(a.in_dir, a.threshold, a.out_dir, pts, a.in_dir_2, a.discretize_pt_only, are_continuous_features = a.are_continuous_features)
