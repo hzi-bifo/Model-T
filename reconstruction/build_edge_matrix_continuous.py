@@ -26,21 +26,17 @@ class build_edge_matrix_continuous(bem.build_edge_matrix):
         """process max likelhood phenotype events and get branch continuous feature value difference """
         char2ev = {}
         node_m = pd.read_csv(recon_f, index_col = 0, sep = "\t")
+        parents = [] 
+        nodes = []
+        for n in node_m.index:
+            if not n == "N1":
+                parents.append(self.label2node[n].parent_node.taxon.label)
+                nodes.append(n)
         for char in node_m.columns:
             print char
-            for n in node_m.index:
-                #N1 tree root has no predecessor
-                if not n == "N1":
-                    if not char in char2ev:
-                        pn = self.label2node[n].parent_node.taxon.label
-                        difference = node_m.loc[n, char] - node_m.loc[pn, char]
-                        char2ev[char] = [(n, pn, difference)]
-                    else:
-                        pn = self.label2node[n].parent_node.taxon.label
-                        if not pn == "N1":
-                            difference = node_m.loc[n, char] - node_m.loc[pn, char]
-                            char2ev[char].append((n, pn, difference))
-        print char2ev
+            differences = node_m.loc[nodes, char] - node_m.loc[parents, char].values
+            char2ev[char] = [(n, pn, difference) for n, pn, difference in zip(nodes, parents, differences)]
+            print char2ev
         #process max likelihood events"""
         f = open(event_f, 'r')
         #skip header
@@ -57,10 +53,10 @@ class build_edge_matrix_continuous(bem.build_edge_matrix):
             ancestor = self.label2node[node].parent_node.taxon.label
             #map phenotypes
             #map characters to their events, -1 to begin counting at zero as gainLoss output starts counting at 1!
-            if not self.pt_ids[int(char) - 802] in char2ev:
-                char2ev[self.pt_ids[int(char) - 802]] = [(node,ancestor,etype, prob, exp)]
+            if not self.pt_ids[int(char) - 1] in char2ev:
+                char2ev[self.pt_ids[int(char) - 1]] = [(node,ancestor,etype, prob, exp)]
             else: 
-                char2ev[self.pt_ids[int(char) - 802]].append((node,ancestor,etype, prob, exp))
+                char2ev[self.pt_ids[int(char) - 1]].append((node,ancestor,etype, prob, exp))
         return char2ev
 
     def get_label_map(self):
