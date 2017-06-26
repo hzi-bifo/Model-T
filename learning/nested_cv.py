@@ -161,7 +161,6 @@ class nested_cv:
     
     def cv(self, x_train, y_train, xp_train, yp_train, x_test , C, no_classifier = 10):
         """train model on given training features and target and return the predicted labels for the left out samples"""
-        print y_train, yp_train
         if not self.likelihood_params is None and "continuous_target" in self.likelihood_params:
             #transform x and y
             x_train, y_train, w = self.transf_from_probs(x_train, y_train, self.likelihood_params)
@@ -225,32 +224,31 @@ class nested_cv:
                     #add inverse features
                     x_train_sub = pd.concat([x_train_sub, 1 - x_train_sub], axis = 1) 
                 if self.do_normalization:
-                    #x_train_sub, scaler = self.normalize(x_train_sub.abs())
-                    x_train_sub = x_train_sub.abs()
-                    pass
+                    #if reconstruction based use absolute change for prediction
+                    if self.is_rec_based:
+                        x_train_sub, scaler = self.normalize(x_train_sub.abs())
+                        #x_train_sub = x_train_sub.abs()
+                    else:
+                        x_train_sub, scaler = self.normalize(x_train_sub.abs())
                 predictor.fit(x_train_sub, y_train_t_sub)
                 #if learning from gene gains and losses, get selected feature and rebuild model based on phyletic patterns
-                models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
-                models.index = x_train_sub.columns
-                models.iloc[:, 0] = predictor.coef_[0]
-                xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
-                xp_train_sub_t = xp_train_sub.copy()
-                xp_train_sub_t.loc[:, ~models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
-                predictor.fit(xp_train_sub_t, yp_train_t_sub)
-                #print "C param", C 
-                #print "bias:", predictor.intercept_[0]
-                #models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
-                #models.index = x_train_sub.columns
-                #models.iloc[:, 0] = predictor.coef_[0]
-                #models = models.loc[models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1),]
-                #print models
+                if self.is_rec_based:
+                    models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
+                    models.index = x_train_sub.columns
+                    models.iloc[:, 0] = predictor.coef_[0]
+                    xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
+                    xp_train_sub_t = xp_train_sub.copy()
+                    xp_train_sub_t.loc[:, ~models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
+                    xp_train_sub_t, scaler = self.normalize(xp_train_sub_t)
+                    predictor.fit(xp_train_sub_t, yp_train_t_sub)
+            #copy test sample before modification
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
                 #add inverse features to test sample
                 x_test_sample = pd.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
+            #normalize test sample
             if self.do_normalization:
-                #x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
-                x_test_sample = x_test_sample.abs()
+                x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
                 pass
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
             all_scores.iloc[:, i]  = predictor.decision_function(x_test_sample)
@@ -460,7 +458,6 @@ class nested_cv:
         
     def majority_feat_sel(self, x, y, x_p, y_p, all_preds, k, pt_out, no_classifier = 10):
         """determine the features occuring in the majority of the k best models"""
-        print all_preds
         #sanity check if number of classifiers selected for majority feature selection exceeds the number of c params
         if k > len(self.config['c_params']):
             sys.exit("number of selected classifiers for feature selection (%s) exceeds the number of c params (%s)" %(k, len(self.config['c_params'])))
@@ -548,10 +545,20 @@ class nested_cv:
                         x_sub =  pd.concat([x_sub, x_sub], axis = 1)
                     #normalize if , reduce = Truethe corresponding option is set
                     if self.do_normalization:
-                        #x_sub, _ = self.normalize(x_sub)
-                        x_sub = x_sub.abs()
+                        x_sub, _ = self.normalize(x_sub.abs())
+                        #x_sub = x_sub.abs()
                         pass
                     predictor.fit(x_sub, y_t_sub)
+                    if self.is_rec_based:
+                        models_t = pd.DataFrame(np.zeros(shape=(x.shape[1], 1)))
+                        models_t.index = x_sub.columns
+                        models_t.iloc[:, 0] = predictor.coef_[0]
+                        xp_sub = x_p.loc[sample_samples_p, sample_feats]
+                        xp_sub_t = xp_sub.copy()
+                        xp_sub_t.loc[:, ~models_t.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
+                        xp_sub_t, _ = self.normalize(xp_sub_t) 
+                        y_p_t_sub = y_p_t.loc[sample_samples_p]
+                        predictor.fit(xp_sub_t, y_p_t_sub)
                 #add inverse features if the corresponding option is set
                 if self.inverse_feats:
                     print "in inverse features mode"
@@ -586,11 +593,15 @@ class nested_cv:
         for i in range(k):
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
+        #standardize the features and write standardization parameters to disk
+        if self.do_normalization:
+            _, scaler = self.normalize(x_p)
+            scale_df = pd.DataFrame(scaler.scale_, index = x_p.columns, columns = ["scale"]).to_csv("%s/%s_scale.txt" % (self.model_out, pt_out), sep = "\t")
+            scale_df = pd.DataFrame(scaler.mean_, index = x_p.columns, columns = ["mean"]).to_csv("%s/%s_mean.txt" % (self.model_out, pt_out), sep = "\t")
         #get baseline classification models for each individual feature
         if not len(feats) == 0:
             #initiate, fit and predict with decision stump for each feature
-            x_p = x_p.abs()
-            preds = [tree.DecisionTreeClassifier(max_depth = 1, class_weight = 'balanced').fit(pd.DataFrame(x_p.loc[:, i]), y_p).predict(pd.DataFrame(x_p.loc[:, i])) for i in feats]
+            preds = [tree.DecisionTreeClassifier(max_depth = 1, class_weight = 'balanced').fit(pd.DataFrame(x_p.loc[:, i]), y_p_t).predict(pd.DataFrame(x_p.loc[:, i])) for i in feats]
             #get confusion matrix
             conf_per_feat = pd.DataFrame([self.confusion_m(y_p_t, pd.Series(p, index = y_p.index).T) for p in preds ]) 
             conf_per_feat.index = feats 
@@ -605,4 +616,3 @@ class nested_cv:
             feat_df.columns = ["description"] + rownames_extd + ["TN", "FP", "FN", "TP", "MACC"]
             columns_out = rownames_extd + ["description"] + ["TN", "FP", "FN", "TP", "MACC"]
             feat_df.sort(columns = ["MACC"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
-    
