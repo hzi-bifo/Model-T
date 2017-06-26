@@ -111,7 +111,8 @@ class pt_classification:
             print "running phenotype", pt, "with", sum(y_p>0), "phenotype-positive samples and", sum(y_p<=0), "phenotype-negative samples"
             if not cv_inner is None:
                 try:
-                    all_preds  = pd.Series(np.array(self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)))
+                    outcome = self.ncv.outer_cv(x,y, x_p, y_p, pt_out, cv_inner = cv_inner)
+                    all_preds, all_scores  = pd.Series(np.array(outcome[0])), outcome[1]
                 except ValueError as e:
                     import traceback
                     print traceback.print_exc(e)
@@ -121,7 +122,6 @@ class pt_classification:
                 all_preds.index = y_p.index
                 y_p_t = y_p.copy()
                 y_p_t[y_p_t == 0] = -1
-                #print all_preds, y_p_t, "y_p and all preds nested cv"
                 pos_acc = self.ncv.recall_pos(y_p_t, all_preds)
                 print "pos_acc", pos_acc
                 #accuracy -1 class
@@ -141,6 +141,8 @@ class pt_classification:
                 with open("%s/cv_acc.txt"%self.model_out, "a") as f:
                     f.write('%s\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc))
                     f.flush()
+                #auc/roc 
+                self.ncv.roc_curve(y_p, all_scores, "%s/%s_roc_curve.png" % (self.model_out, pt_out), pos_acc, 1 - neg_acc)
             all_preds, all_scores  = self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out)
             all_preds = pd.DataFrame(all_preds)
             all_scores = pd.DataFrame(all_scores)
@@ -159,7 +161,7 @@ class pt_classification:
             #skip nested cv
             #for i in range(8476 * (10 + 10 + 10 * 10 * (len(self.config['c_params']) + 1)) ):
             #    random.randint(0,9)
-            self.ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, self.config['k'], pt_out)
+            self.ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, all_scores, self.config['k'], pt_out)
 
 if __name__=="__main__":
     import argparse
