@@ -29,14 +29,12 @@ class build_edge_matrix_continuous(bem.build_edge_matrix):
         parents = [] 
         nodes = []
         for n in node_m.index:
-            if not n == "N1":
+            if not n == "N1" and not self.label2node[n].parent_node.taxon.label == "N1":
                 parents.append(self.label2node[n].parent_node.taxon.label)
                 nodes.append(n)
         for char in node_m.columns:
-            print char
             differences = node_m.loc[nodes, char] - node_m.loc[parents, char].values
             char2ev[char] = [(n, pn, difference) for n, pn, difference in zip(nodes, parents, differences)]
-            print char2ev
         #process max likelihood events"""
         f = open(event_f, 'r')
         #skip header
@@ -86,11 +84,11 @@ class build_edge_matrix_continuous(bem.build_edge_matrix):
                     edge2 = node2edge[ev[1]]
                 else: continue
                 isn = edge1.intersection(edge2)
-                #if len(isn) == 0:
-                    #print "event",ev
-                    #print "edge1",edge1
-                    #print "edge2",edge2
-                    #continue
+                if len(isn) == 0:
+                    print "event",ev
+                    print "edge1",edge1
+                    print "edge2",edge2
+                    continue
                 isn = isn.pop()
                 if isn in edge2char2val and gt in edge2char2val[isn]:
                     edge2char2val[isn][gt] += ev[2]

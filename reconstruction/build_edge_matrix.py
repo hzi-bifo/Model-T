@@ -234,12 +234,12 @@ class build_edge_matrix:
         #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
         for e in edges:
             #s="%s\t"%str("_".join(e))
-            for gt in feats:
-                if gt in edge2char2val[tuple(e)]:
-                    out_m.loc["_".join(e), gt] = edge2char2val[tuple(e)][gt]
+            values = pd.np.zeros(len(feats))
+            for i in range(len(feats)):
+                if feats[i] in edge2char2val[tuple(e)]:
+                    values[i] = edge2char2val[tuple(e)][feats[i]]
                     #s+="%s\t"%edge2char2val[tuple(e)][gt]
-                #else:
-                #    s+="0\t"
+            out_m.loc["_".join(e), feats] = values 
             #only consider the phenotype if it's not part of the genotypes ergo no missing values are involved
             if pt not in feats and pt in edge2char2val[tuple(e)]:
                 #print "this shouldn't happen"
