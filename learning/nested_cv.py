@@ -10,11 +10,20 @@ import random
 import cv_rec_helper as crh 
 import sys
 import itertools
+#standardization
 import sklearn.preprocessing as preprocessing
 import copy_reg
 import types
 import os
+#feature importance
 import scipy.stats
+#auc/roc + probability calibration#auc/roc
+import sklearn.calibration as clb
+import matplotlib
+#avoid using X display
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
 
 def _pickle_method(method):
@@ -151,6 +160,27 @@ class nested_cv:
         """compute balanced accuracy"""
         return float(pos_acc + neg_acc)/2
     
+    def roc_curve(self, y, all_scores, out, tpr_opt, fpr_opt):
+        """plot roc curve and compute auc"""
+        #auc / roc
+        fpr, tpr, _ = roc_curve(y, all_scores)
+        roc_auc = auc(fpr, tpr)
+        plt.figure()
+        lw = 2
+        fig, ax = plt.subplots()
+        plt.plot(fpr, tpr, color='darkorange',lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+        ax.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        ax.scatter([fpr_opt],[tpr_opt])
+        print fpr_opt, tpr_opt
+        ax.annotate("bacc opt %.2f " % (((1 - fpr_opt) + tpr_opt)/2), (fpr_opt, tpr_opt)) 
+        plt.title('Receiver operating characteristic')
+        plt.legend(loc="lower right")
+        plt.savefig(out)
+        
     def balance_weights(self, weights, y):
         """balance weights between pos/neg class in phyletic pattern and in the reconstruction based samples """
         weights.index = y.index
@@ -219,6 +249,8 @@ class nested_cv:
                     X, scaler = self.normalize(X)
                 y = pd.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
                 predictor.fit(X = X, y = y)
+                cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                cclf.fit(X, y)
             else: 
                 if self.inverse_feats:
                     #add inverse features
@@ -231,6 +263,9 @@ class nested_cv:
                     else:
                         x_train_sub, scaler = self.normalize(x_train_sub.abs())
                 predictor.fit(x_train_sub, y_train_t_sub)
+                #probability calibration
+                cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                cclf.fit(x_train_sub, y_train_t_sub)
                 #if learning from gene gains and losses, get selected feature and rebuild model based on phyletic patterns
                 if self.is_rec_based:
                     models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
@@ -251,7 +286,10 @@ class nested_cv:
                 x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
                 pass
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
-            all_scores.iloc[:, i]  = predictor.decision_function(x_test_sample)
+            #use calibration classifier
+            uncalibrated  = predictor.decision_function(x_test_sample)
+            all_scores.iloc[:, i]  = pd.Series(cclf.predict_proba(x_test_sample)[:, 1])
+            # uncalibrated, all_scores.iloc[:, i]
         #do majority vote to aggregate predictions
         aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
         return aggr_preds, all_scores 
@@ -408,7 +446,10 @@ class nested_cv:
         if not cv_inner is None:
             ofolds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
             print "outer folds set up"
+            #list of predictions
             ocv_preds = []
+            #list of probability scores for those predictions
+            ocv_scores = []
             for i in range(len(ofolds)):
                 x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test  = ofolds[i]
                 ifolds = self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i)
@@ -437,7 +478,8 @@ class nested_cv:
                 #use that C param to train a classifier to predict the left out samples in the outer cv
                 p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10)
                 ocv_preds += list(p)
-            return ocv_preds
+                ocv_scores += list(score.iloc[:, 0])
+            return ocv_preds, ocv_scores
         
         folds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
         #store predictions for each fold in all_preds
@@ -456,7 +498,7 @@ class nested_cv:
         return all_preds, all_scores
         
         
-    def majority_feat_sel(self, x, y, x_p, y_p, all_preds, k, pt_out, no_classifier = 10):
+    def majority_feat_sel(self, x, y, x_p, y_p, all_preds, all_scores, k, pt_out, no_classifier = 10):
         """determine the features occuring in the majority of the k best models"""
         #sanity check if number of classifiers selected for majority feature selection exceeds the number of c params
         if k > len(self.config['c_params']):
@@ -539,6 +581,9 @@ class nested_cv:
                     #predictor.fit(X, pd.concat([y_t, y_p_t], axis = 0), sample_weight = pd.concat([balance_weights(w, y_t), balance_weights(pd.Series(np.ones(shape = len(y_p))), y_p_t)]))
                     #END EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
                     predictor.fit(X, pd.concat([y_t_sub, y_p_t_sub], axis = 0))
+                    #probability calibration
+                    cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                    cclf.fit(X, pd.concat([y_t_sub, y_p_t_sub]))
                 else:
                     if self.inverse_feats:
                         #add inverse features
@@ -549,6 +594,9 @@ class nested_cv:
                         #x_sub = x_sub.abs()
                         pass
                     predictor.fit(x_sub, y_t_sub)
+                    #probability calibration
+                    cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                    cclf.fit(x_sub, y_t_sub)
                     if self.is_rec_based:
                         models_t = pd.DataFrame(np.zeros(shape=(x.shape[1], 1)))
                         models_t.index = x_sub.columns
@@ -559,6 +607,9 @@ class nested_cv:
                         xp_sub_t, _ = self.normalize(xp_sub_t) 
                         y_p_t_sub = y_p_t.loc[sample_samples_p]
                         predictor.fit(xp_sub_t, y_p_t_sub)
+                        #probability calibration
+                        cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                        cclf.fit(xp_sub_t, y_p_t_sub)
                 #add inverse features if the corresponding option is set
                 if self.inverse_feats:
                     print "in inverse features mode"
@@ -582,6 +633,10 @@ class nested_cv:
         baccs_s_np_p = pd.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
         #write them to disk
         pd.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
+        #roc curves
+        all_scores.columns = self.config['c_params']
+        for c_param, pos_rec, neg_rec in [(baccs_s[i][3], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
+            self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
         #determine features with non-zero weights
         for i in range(models.shape[0]):
             if sum(models.loc[models.index[i],:] != 0) > 1:
