@@ -1,0 +1,20 @@
+#! /usr/bin/env python
+import pandas as pd
+from traitarm.learning.discretize_likelihood_recon import threshold_matrix 
+
+if __name__=="__main__":
+    #test script
+    import sys
+    import argparse
+    parser = argparse.ArgumentParser("traitar-model the phenotype classifier")
+    parser.add_argument("in_dir", help='<input dir> with edge matrices corresponding to the likelihood of gain or loss events')
+    parser.add_argument("out_dir", help='<out dir> for the discretized matrices ')
+    parser.add_argument("phenotypes", help='list of phenotypes to be processed')
+    parser.add_argument("--in_dir_2", default = None, help='<optional second directory> with gain or loss likelihood matrices that shall be combined with those given in the input dir specified by the <in_dir> option')
+    parser.add_argument("--threshold", default = 0.5,  help="threshold to discretize the likelihood matrices i.e. transform them into actual reconstruction events i.e. m [ m > threshold ] = 1 ; m [ m < threshold] = 0" )
+    parser.add_argument("--discretize_pt_only", help='if option set discretize phenotypes only', action = "store_true")
+    parser.add_argument("--are_continuous_features", help='set option if features are continuous', action = "store_true")
+    a = parser.parse_args()
+    #read in phenotype list
+    pts = pd.read_csv(a.phenotypes, sep = "\t", index_col = 0).index.astype('string')
+    threshold_matrix(a.in_dir, a.threshold, a.out_dir, pts, a.in_dir_2, a.discretize_pt_only, are_continuous_features = a.are_continuous_features)

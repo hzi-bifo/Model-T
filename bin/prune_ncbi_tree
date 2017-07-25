@@ -1,0 +1,17 @@
+#! /usr/bin/env python
+from traitarm.reconstruction.prune_ncbi_tree import prune_ncbi_tree
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser("prune tree by given ncbi ids")
+    parser.add_argument("tree", help = "tree for pruning")
+    parser.add_argument("--ncbi_ids", default = None, help = "ncbi tax ids to be retained")
+    parser.add_argument("out", help = "out tree file")
+    parser.add_argument("--failed_to_map", help = "out file with ids that weren't contained in the input tree")
+    parser.add_argument("--format", type = int, help = "tree out format as in ete library", default = 1)
+    parser.add_argument("--do_name_internal", action = "store_true",  help = "name internal nodes of the pruned tree by N1, N2 etc.")
+    parser.add_argument("--newick_extended", action = "store_true",  help = "use extended newick for output")
+    parser.add_argument("--resolve_polytomy", action = "store_true",  help = "use this option if tree is not bifurcating, which is required by subsequent steps")
+    args = parser.parse_args()
+    prune_ncbi_tree(args.tree, args.ncbi_ids, args.format, args.out, args.newick_extended, args.do_name_internal, args.failed_to_map, args.resolve_polytomy)

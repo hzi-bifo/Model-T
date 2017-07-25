@@ -1,0 +1,19 @@
+#! /usr/bin/env python
+from traitarm.reconstruction.summary2gainLoss_input import split 
+import argparse
+import pandas as pd
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser("prepare fasta input for gainLoss program")
+    parser.add_argument("in_matrix", help='phylogenetic tree')
+    parser.add_argument("out_f", help='phylogenetic tree')
+    parser.add_argument("--ids", help='restrict to those ids e.g. if tree does not cover all sequences', default = None)
+    parser.add_argument("--phenotypes", help='phenotype labels', default = None)
+    parser.add_argument("--parts", type = int, default = None, help='split matrix into <parts> subsets and output each sub matrix as fasta')
+    parser.add_argument("--randomize", action = 'store_true', help='set if output should be randomized')
+    a = parser.parse_args()
+    m = pd.read_csv(a.in_matrix, sep = "\t", index_col = 0, na_values = "?")
+    if a.ids is not None:
+        samples = pd.read_csv(a.ids, index_col = 0, header = None)
+        m = m.loc[samples.index,]
+    split(m, a.out_f, a.parts, a.randomize, a.phenotypes, a.ids)
