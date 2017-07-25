@@ -1,20 +1,14 @@
 import numpy as np
 import pandas as pd
+#learning
 import sklearn.svm as svm
 from sklearn import tree 
-from joblib import Parallel, delayed, load, dump
-#TODO use the sklearn version of joblib instead to remove the direct joblib dependency
-from operator import itemgetter
-import math
-import random
-import cv_rec_helper as crh 
-import sys
-import itertools
 #standardization
 import sklearn.preprocessing as preprocessing
-import copy_reg
-import types
-import os
+#ancestral reconstruction of phenotype
+import cv_rec_helper as crh 
+#cross validation
+from sklearn.model_selection import KFold, GroupKFold
 #feature importance
 import scipy.stats
 #auc/roc + probability calibration#auc/roc
@@ -23,39 +17,22 @@ import matplotlib
 #avoid using X display
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+#make sure figures produced in this script are not cut
+#from matplotlib import rcParams
+#rcParams.update({'figure.autolayout': True})
 from sklearn.metrics import roc_curve, auc
 
+from operator import itemgetter
+import math
+import random
+import sys
+import itertools
+import os
 
-def _pickle_method(method):
-        # Author: Steven Bethard
-        # http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods
-        func_name = method.im_func.__name__
-        obj = method.im_self
-        cls = method.im_class
-        cls_name = ''
-        if func_name.startswith('__') and not func_name.endswith('__'):
-            cls_name = cls.__name__.lstrip('_')
-        if cls_name:
-            func_name = '_' + cls_name + func_name
-        return _unpickle_method, (func_name, obj, cls)
-
-def _unpickle_method(func_name, obj, cls):
-    # Author: Steven Bethard
-    # http://bytes.com/topic/python/answers/552476-why-cant-you-pickle-instancemethods
-    for cls in cls.mro():
-        try:
-            func = cls.__dict__[func_name]
-        except KeyError:
-            pass
-        else:
-            break
-        return func.__get__(obj, cls)
-
-copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features):
+    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -72,6 +49,10 @@ class nested_cv:
         self.pf2desc_f = pf2desc_f
         self.consider_in_recon = consider_in_recon
         self.is_discrete_phenotype_with_continuous_features  = is_discrete_phenotype_with_continuous_features
+        if block_cross_validation is not None:
+            self.block_cross_validation = pd.read_csv(block_cross_validation, index_col = 0, sep = "\t")
+        else:
+            self.block_cross_validation = None
 
     def transf_from_probs(self, x, y):
         """create a series of sample specific weights according to the probabilities"""
@@ -148,6 +129,13 @@ class nested_cv:
         return TP / float(TP + FP)   
 
     @staticmethod 
+    def f1_score(recall, precision):
+        """compute f1-measure"""
+        if (precision + recall) != 0:
+            return 2 * (precision * recall) / (precision + recall)    
+        return 0
+
+    @staticmethod 
     def precision_conf(conf):
         """compute precision"""
         TN, FP, FN, TP = conf
@@ -175,11 +163,11 @@ class nested_cv:
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
         ax.scatter([fpr_opt],[tpr_opt])
-        print fpr_opt, tpr_opt
         ax.annotate("bacc opt %.2f " % (((1 - fpr_opt) + tpr_opt)/2), (fpr_opt, tpr_opt)) 
         plt.title('Receiver operating characteristic')
         plt.legend(loc="lower right")
         plt.savefig(out)
+        plt.close()
         
     def balance_weights(self, weights, y):
         """balance weights between pos/neg class in phyletic pattern and in the reconstruction based samples """
@@ -189,7 +177,7 @@ class nested_cv:
         return weights
     
     
-    def cv(self, x_train, y_train, xp_train, yp_train, x_test , C, no_classifier = 10):
+    def cv(self, x_train, y_train, xp_train, yp_train, x_test , C, no_classifier = 10, do_calibration = False):
         """train model on given training features and target and return the predicted labels for the left out samples"""
         if not self.likelihood_params is None and "continuous_target" in self.likelihood_params:
             #transform x and y
@@ -238,7 +226,7 @@ class nested_cv:
                 #END EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
                 xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
                 #EXPERIMENTAL BALANCE WEIGHTS
-                #sample_weight = pd.concat([balance_weights(w, y_train_t), balance_weights(pd.Series(np.ones(len(yp_train_t))), yp_train_t)])
+                #sample_weight = pd.concat([balance_weights(w, y_train_t), balance_weights(pd.Series(n, sep = "\t"p.ones(len(yp_train_t))), yp_train_t)])
                 #print sample_weight.sum(), "sample weights total"
                 #END EXPERIMENTAL BALANCE WEIGHTS
                 X = pd.concat([x_train_sub, xp_train_sub], axis = 0)
@@ -249,8 +237,9 @@ class nested_cv:
                     X, scaler = self.normalize(X)
                 y = pd.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
                 predictor.fit(X = X, y = y)
-                cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
-                cclf.fit(X, y)
+                if do_calibration:
+                    cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                    cclf.fit(X, y)
             else: 
                 if self.inverse_feats:
                     #add inverse features
@@ -263,9 +252,6 @@ class nested_cv:
                     else:
                         x_train_sub, scaler = self.normalize(x_train_sub.abs())
                 predictor.fit(x_train_sub, y_train_t_sub)
-                #probability calibration
-                cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
-                cclf.fit(x_train_sub, y_train_t_sub)
                 #if learning from gene gains and losses, get selected feature and rebuild model based on phyletic patterns
                 if self.is_rec_based:
                     models = pd.DataFrame(np.zeros(shape=(x_train.shape[1], 1)))
@@ -274,8 +260,17 @@ class nested_cv:
                     xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
                     xp_train_sub_t = xp_train_sub.copy()
                     xp_train_sub_t.loc[:, ~models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
-                    xp_train_sub_t, scaler = self.normalize(xp_train_sub_t)
+                    if self.do_normalization:
+                        xp_train_sub_t, scaler = self.normalize(xp_train_sub_t)
                     predictor.fit(xp_train_sub_t, yp_train_t_sub)
+                #probability calibration
+                    if do_calibration:
+                        cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                        cclf.fit(xp_train_sub_t, yp_train_t_sub)
+                else:
+                    if do_calibration:
+                        cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
+                        cclf.fit(x_train_sub, y_train_t_sub)
             #copy test sample before modification
             x_test_sample = x_test.loc[:, sample_feats].copy()
             if self.inverse_feats:
@@ -284,11 +279,11 @@ class nested_cv:
             #normalize test sample
             if self.do_normalization:
                 x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
-                pass
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
             #use calibration classifier
-            uncalibrated  = predictor.decision_function(x_test_sample)
-            all_scores.iloc[:, i]  = pd.Series(cclf.predict_proba(x_test_sample)[:, 1])
+            if do_calibration:
+                uncalibrated  = predictor.decision_function(x_test_sample)
+                all_scores.iloc[:, i]  = pd.Series(cclf.predict_proba(x_test_sample)[:, 1])
             # uncalibrated, all_scores.iloc[:, i]
         #do majority vote to aggregate predictions
         aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
@@ -392,9 +387,9 @@ class nested_cv:
         return x_r_train, y_r_train, x_r_test, y_r_test
     
     
-    def setup_folds(self, x, y, cv, x_p, y_p, pt_out, ofold = None):
+    def setup_folds(self, x, y, cv, x_p, y_p, pt_out, ofold = None, do_block_cross_validation = True):
         """prepare all combinations of training and test folds, either for the standard phyletic pattern or the likelihood / parsimony reconstruction case or for the combined case"""
-        pfolds = self.setup_folds_phypat(x_p, y_p, cv)
+        pfolds = self.setup_folds_phypat(x_p, y_p, cv, do_block_cross_validation)
         if not self.is_rec_based:
             #standard phyletic pattern cv
             return pfolds
@@ -409,92 +404,79 @@ class nested_cv:
                 folds.append((x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test))
         return folds
     
-    def setup_folds_phypat(self, x, y, cv):
-        """divide the samples into cv folds and return a list of index lists"""
-        print "y length", len(y)
-        fold_l = len(y)/cv
-        print "fold_l", fold_l
-        #number of folds with one more element
-        fold_l_e = len(y)%cv
-        print "fold_l_e", fold_l_e
-        #list of folds lists
+    def setup_folds_phypat(self, x, y, cv, do_block_cross_validation = True):
+        """divide the samples into cv folds and return a list of training and test folds"""
         folds = []
-        for i in range(fold_l_e):
-            index = range(i*(fold_l+1), i*(fold_l+1)+fold_l+1)
-            #print x.shape, "phyletic pattern shape before removing test samples"
-            x_train = x.drop(x.index[index])
-            #print x_train.shape, "phyletic pattern shape after removing test samples"
-            x_test = x.iloc[index,:]
-            y_train = y.drop(y.index[index])
-            folds.append((x_train, y_train, x_test, None, x_train, y_train, x_test))
-        n_e = fold_l_e * (fold_l+1)
-        for i in range(cv - fold_l_e):
-            index = range(n_e + fold_l*i, n_e + fold_l*i + fold_l)
-            x_train = x.drop(x.index[index])
-            x_test = x.iloc[index,:]
-            y_train = y.drop(y.index[index])
+        #block cross validation
+        if self.block_cross_validation is not None and do_block_cross_validation:
+            kf = GroupKFold(n_splits = cv)
+            kf_split = kf.split(x, groups = self.block_cross_validation.loc[x.index, "group_id"].tolist())
+        #normal k fold cross-validation
+        else:
+            kf = KFold(n_splits = cv)
+            kf_split = kf.split(x)
+        #create training and test folds
+        for train, test in kf_split:
+            x_train = x.iloc[train, :].copy()
+            y_train = y.iloc[train].copy()
+            x_test = x.iloc[test, :].copy()
             folds.append((x_train, y_train, x_test, None, x_train, y_train, x_test))
         return folds
     
     
     
-    def outer_cv(self, x, y, x_p, y_p, pt_out, cv_inner = None):
+    def outer_cv(self, x, y, x_p, y_p, pt_out, cv_inner = None, do_calibration = True):
         """do a cross validation with cv_outer folds
         if only cv_outer is given do a cross validation for each value of the paramter C given
         if cv_inner is given, do a nested cross validation optimizing the paramter C in the inner loop"""
         #do n fold cross validation
         if not cv_inner is None:
             ofolds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
-            print "outer folds set up"
+            #print "outer folds set up"
             #list of predictions
-            ocv_preds = []
-            #list of probability scores for those predictions
-            ocv_scores = []
+            ocv_preds = pd.Series(np.zeros(shape=[len(y_p)]))
+            ocv_preds.index = x_p.index
+            ocv_scores = ocv_preds.copy()
             for i in range(len(ofolds)):
                 x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test  = ofolds[i]
-                ifolds = self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i)
-                print "inner folds set up"
+                ifolds = self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i, do_block_cross_validation = False)
+                #print "inner folds set up"
                 all_preds = pd.DataFrame(np.zeros(shape=[len(yp_train), len(self.config['c_params'])]))
                 all_preds.columns = self.config['c_params']
                 all_preds.index = yp_train.index
                 #do inner cross validation
-                preds = []
-                for pred, _ in Parallel(n_jobs=self.n_jobs)(delayed(self.cv)(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, self.config['c_params'][j])
-                        for(x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) 
-                            in ((x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test, j) for x_train_train, y_train_train, x_train_test, y_train_test,  xp_train_train, yp_train_train, xp_train_test in ifolds for j in range(len(self.config['c_params'])))):
-                    preds.append(list(pred))
-                preds_ordered = [[] for i in range(len(self.config['c_params']))]
-                for i in range(len(preds)):
-                    preds_ordered[i % len(self.config['c_params'])] += preds[i]
-                all_preds = pd.DataFrame(np.array(preds_ordered), index = self.config['c_params'], columns = yp_train.index).T
+                for x_train_train, y_train_train, x_train_test, y_train_test, xp_train_train, yp_train_train, xp_train_test in ifolds:
+                    for c_param in self.config['c_params']:
+                        preds, _ = self.cv(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, c_param)
+                        all_preds.loc[x_train_test.index, c_param] = list(preds)
                 #determine C param with the best accuracy
                 #copy yp train and change the negative labels from 0 to -1
                 yp_t_t = yp_train.copy()
                 yp_t_t[yp_t_t == 0] = -1
                 baccs = [self.bacc(self.recall_pos(yp_t_t, all_preds.iloc[:,j]), self.recall_neg(yp_t_t, all_preds.iloc[:,j])) for j in range(len(self.config['c_params']))]
-                print baccs, "baccs"
+                #print baccs, "baccs"
                 c_opt = self.config['c_params'][np.argmax(np.array(baccs))]
-                print c_opt, "optimal value of the C param is this fold"
+                #print c_opt, "optimal value of the C param is this fold"
                 #use that C param to train a classifier to predict the left out samples in the outer cv
-                p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10)
-                ocv_preds += list(p)
-                ocv_scores += list(score.iloc[:, 0])
+                p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10, do_calibration = do_calibration)
+                ocv_preds.loc[xp_test.index] = list(p)
+                ocv_scores.loc[xp_test.index] = list(score.iloc[:, 0])
             return ocv_preds, ocv_scores
         
         folds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
         #store predictions for each fold in all_preds
-        all_preds = np.zeros(shape=[len(y_p), len(self.config['c_params'])])
-        all_scores = np.zeros(shape=[len(y_p), len(self.config['c_params'])])
+        all_preds = pd.DataFrame(np.zeros(shape=[len(y_p), len(self.config['c_params'])]))
+        all_preds.index = x.index
+        all_preds.columns = self.config['c_params']
+        all_scores = all_preds.copy()
         #do a cross validation for each value of the C param
-        for j in range(len(self.config['c_params'])):
-            preds = []
-            scores = []
-            for pred, score in Parallel(n_jobs= self.n_jobs)(delayed(self.cv)(x_train, y_train, xp_train, yp_train, xp_test, self.config['c_params'][j])
-                    for  x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in folds):
-                preds += list(pred)
-                scores += list(score[0])
-            all_preds[:,j] = preds
-            all_scores[:,j] = scores 
+        for x_train, y_train, x_test, y_test, xp_train, yp_train, xp_test in folds:
+            for c_param in self.config['c_params']:
+                preds, scores = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_param, do_calibration = do_calibration)
+                all_preds.loc[xp_test.index, c_param] = list(preds)
+                all_scores.loc[xp_test.index, c_param] = list(scores.iloc[:, 0]) 
+                #print all_scores.loc[xp_test.index, c_param]  
+                #print scores
         return all_preds, all_scores
         
         
@@ -532,8 +514,12 @@ class nested_cv:
         recps = [self.recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
         #recall of pt negative class
         recns = [self.recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
+        #precision
+        precs = [self.precision(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
+        #f1 score
+        f1_scores = [self.f1_score(recall, precision) for recall, precision in zip(recps, precs)]
         #sort values of the C params tested according to balanced accuracy achieved
-        baccs_s = sorted(((baccs[i], recps[i], recns[i], self.config['c_params'][i]) for i in range(len(self.config['c_params']))), key=itemgetter(0), reverse=True )
+        baccs_s = sorted(((baccs[i], recps[i], recns[i], precs[i], f1_scores[i], self.config['c_params'][i]) for i in range(len(self.config['c_params']))), key=itemgetter(0), reverse=True )
         predictors = []
         #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
@@ -581,9 +567,6 @@ class nested_cv:
                     #predictor.fit(X, pd.concat([y_t, y_p_t], axis = 0), sample_weight = pd.concat([balance_weights(w, y_t), balance_weights(pd.Series(np.ones(shape = len(y_p))), y_p_t)]))
                     #END EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
                     predictor.fit(X, pd.concat([y_t_sub, y_p_t_sub], axis = 0))
-                    #probability calibration
-                    cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
-                    cclf.fit(X, pd.concat([y_t_sub, y_p_t_sub]))
                 else:
                     if self.inverse_feats:
                         #add inverse features
@@ -594,9 +577,6 @@ class nested_cv:
                         #x_sub = x_sub.abs()
                         pass
                     predictor.fit(x_sub, y_t_sub)
-                    #probability calibration
-                    cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
-                    cclf.fit(x_sub, y_t_sub)
                     if self.is_rec_based:
                         models_t = pd.DataFrame(np.zeros(shape=(x.shape[1], 1)))
                         models_t.index = x_sub.columns
@@ -604,12 +584,10 @@ class nested_cv:
                         xp_sub = x_p.loc[sample_samples_p, sample_feats]
                         xp_sub_t = xp_sub.copy()
                         xp_sub_t.loc[:, ~models_t.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
-                        xp_sub_t, _ = self.normalize(xp_sub_t) 
+                        if self.do_normalization:
+                            xp_sub_t, _ = self.normalize(xp_sub_t) 
                         y_p_t_sub = y_p_t.loc[sample_samples_p]
                         predictor.fit(xp_sub_t, y_p_t_sub)
-                        #probability calibration
-                        cclf = clb.CalibratedClassifierCV(predictor, method = 'sigmoid', cv = 'prefit')
-                        cclf.fit(xp_sub_t, y_p_t_sub)
                 #add inverse features if the corresponding option is set
                 if self.inverse_feats:
                     print "in inverse features mode"
@@ -627,22 +605,22 @@ class nested_cv:
         pd.DataFrame(bias_cparams).to_csv("%s/%s_bias.txt"%(self.model_out,pt_out), sep = "\t", index = None, header = None)
         feats = []
         #prepare performance statistics
-        rownames = [baccs_s[i][3] for i in range(k)] 
-        colnames = ['bacc', "pos_rec", "neg_rec"]
-        baccs_s_np = np.array(baccs_s)[0:k, 0:3].T
-        baccs_s_np_p = pd.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(3)))
+        rownames = [baccs_s[i][5] for i in range(k)] 
+        colnames = ['bacc', "pos_rec", "neg_rec", "precision", "F1-score"]
+        baccs_s_np = np.array(baccs_s)[0:k, :5].T
+        baccs_s_np_p = pd.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(5)))
         #write them to disk
         pd.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
         #roc curves
         all_scores.columns = self.config['c_params']
-        for c_param, pos_rec, neg_rec in [(baccs_s[i][3], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
+        for c_param, pos_rec, neg_rec in [(baccs_s[i][5], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
             self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
         #determine features with non-zero weights
         for i in range(models.shape[0]):
             if sum(models.loc[models.index[i],:] != 0) > 1:
                 feats.append(models.index[i])
         #write all the features with their weights to disk
-        rownames_extd = [str(baccs_s[i][3]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
+        rownames_extd = [str(baccs_s[i][5]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
         models_df = pd.DataFrame(models)
         models_df.columns = rownames_extd
         for i in range(k):
@@ -670,4 +648,64 @@ class nested_cv:
             feat_df = pd.concat([pf2desc.loc[feats, ], models_df.loc[feats, ], perf_per_feat], axis = 1)
             feat_df.columns = ["description"] + rownames_extd + ["TN", "FP", "FN", "TP", "MACC"]
             columns_out = rownames_extd + ["description"] + ["TN", "FP", "FN", "TP", "MACC"]
-            feat_df.sort(columns = ["MACC"], ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+            feat_df.sort_values(by = ["MACC"], axis = 0, ascending = False).to_csv("%s/%s_non-zero+weights.txt"%(self.model_out,pt_out), columns = columns_out, float_format='%.3f',  sep = "\t")
+            #produce heatmaps
+            self.feat_heatmap(models_df.loc[feats, ], perf_per_feat, x_p.loc[:, feats], y_p_t, pt_out)
+
+    def feat_heatmap(self, models_df, perf_per_feat, feat_df, y, pt_out):
+        """make a heatmap of feature occurence across samples and feature SVM weights"""
+        #feature occurence heatmap
+        feats_sorted = perf_per_feat.loc[:, "MACC"].sort_values()
+        #sort by phenotype positive and negative samples
+        y_sorted = y.sort_values()
+        target_df = feat_df.loc[y_sorted.index, feats_sorted.index]
+        target_df.index = target_df.index.astype('string')
+        phn_f = pd.read_csv(self.config["phyn_f"], sep = "\t", index_col = 0)
+        phn_f.index = phn_f.index.astype('string')
+        target_df.index = phn_f.loc[target_df.index, :].iloc[:, 0]
+        target_df.index.name = ""
+        import seaborn
+        seaborn.set()
+        f, (ax1, ax2) = plt.subplots(2, sharex = True, gridspec_kw = {'height_ratios': [3, 1]})
+        #restrict to top 20 features
+        hm = seaborn.heatmap(target_df.iloc[:, -20:], ax = ax1, cbar_kws={'label': 'Feature occurence'})
+        #feature weight heatmap
+        models_df_sorted = models_df.T.loc[:, feats_sorted.index]
+        hm2 = seaborn.heatmap(models_df_sorted.astype('float').iloc[:, -20:], ax = ax2, cbar_kws={'label': 'Feature SVM weight'})
+        feats_sorted = feats_sorted.iloc[-20:]
+        #perf per feat
+        #seaborn.heatmap(pd.DataFrame(feats_sorted).T)
+        plt.suptitle("Discriminatory features across samples and their contribution to the classifier")
+        ax1.set_xlabel('Features')
+        ax1.set_ylabel('Samples (colored by class)')
+        ax2.set_ylabel('SVM C-parameter')
+        #ax3_labels = [item.get_text() for item in ax3.get_xticklabels()]
+        #for i in range(2,5):
+        #    ax3_labels [i]= ""
+        #ax3.set_yticklabels(ax3_labels)
+        plt.gcf().subplots_adjust(bottom=0.15)
+        plt.tight_layout()
+
+        #adjust label size to number of samples
+        for label in (ax1.get_yticklabels()):
+                if len(y) > 10:
+                    label.set_fontsize(12)
+                if len(y) > 30:
+                    label.set_fontsize(8)
+                if len(y) > 50:
+                    label.set_fontsize(5)
+                if len(y) > 70:
+                    label.set_fontsize(3)
+                if len(y) > 100:
+                    label.set_fontsize(2)
+                if len(y) > 200:
+                    label.set_fontsize(1)
+                if y.loc[label.get_text()] == 1:
+                    label.set_color('orange')
+                else:
+                    label.set_color('blue')
+        plt.savefig("%s/%s_heatmap.png" %(self.model_out, pt_out), dpi = 300)
+        plt.close()
+
+
+
