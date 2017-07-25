@@ -15,13 +15,12 @@ def loop(parts, cmd_strings, args_dict, fns, out_dir, jobs, cpus):
     for fn in fns:
         sys.stdout.write("cat %s/%s | parallel -j %s\n" % (out_dir, fn, cpus))
 
-def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_tables, code_dir, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, do_phypat_only, cpus, anno_type, do_normalization):
+def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_tables, code_dir, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, do_phypat_only, cpus, anno_source, do_normalization, block_cross_validation):
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    #merge_str = "python %(code_dir)s/reconstruction/merge_annot_and_pt.py %(annotation_table)s %(phenotype_table)s %(out_dir)s"
     #merge annotation/features and phenotype data
     pts = merge_annot_and_pt.merge_data(annotation_tables, phenotype_table, out_dir).index.tolist()
-    args_dict = {"tree_unpruned" : tree_unpruned, "out_dir" : out_dir, "features" : "feats.txt", "phenotypes" : "phenotypes.txt" , "parts": parts, "code_dir" : code_dir, "phenotype_table" : phenotype_table, "anno_type": anno_type} 
+    args_dict = {"tree_unpruned" : tree_unpruned, "out_dir" : out_dir, "features" : "feats.txt", "phenotypes" : "phenotypes.txt" , "parts": parts, "code_dir" : code_dir, "phenotype_table" : phenotype_table, "anno_source": anno_source} 
     pts = pd.read_csv("%s/phenotypes.txt" % out_dir, index_col = 0).index.tolist()
     if not do_phypat_only:
         prune_str = "python %(code_dir)s/reconstruction/prune_ncbi_tree.py %(tree_unpruned)s --ncbi_ids %(out_dir)s/ids.txt %(out_dir)s/tree_named.tre --do_name_internal --resolve_polytomy"
@@ -56,15 +55,21 @@ def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_tables, code_d
         args_dict['do_normalization'] = '--do_normalization'
     else:
         args_dict['do_normalization'] = ''
-    learn_phypat = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --with_seed --resume %(do_normalization)s"
+    if block_cross_validation:
+        args_dict['block_cross_validation'] = '--block_cross_validation %s' % block_cross_validation
+        args_dict['block_cross_validation_switch'] = "_block_cv" 
+    else:
+        args_dict['block_cross_validation'] = ''
+        args_dict['block_cross_validation_switch'] = ''
+    learn_phypat = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --with_seed --resume %(do_normalization)s %(block_cross_validation)s"
     cmd_strings = [learn_phypat] 
     #prediction modes
     modes = ["phypat"]
     if not do_phypat_only: 
         modes = modes + ["phypat_pgl", "pgl"]
         fns = fns + ["learn_phypat+pgl.sh", "learn_pgl.sh"]
-        learn_phypat_pgl = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_pgl_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --is_phypat_and_rec --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume"
-        learn_pgl =  "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_pgl_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s  --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume " 
+        learn_phypat_pgl = "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_phypat_pgl%(block_cross_validation_switch)s_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s --is_phypat_and_rec --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s"
+        learn_pgl =  "python %(code_dir)s/learning/learn.py %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_pgl_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(code_dir)s/learning/config.json %(sample_mapping)s  --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s" 
         cmd_strings.append(learn_phypat_pgl)
         cmd_strings.append(learn_pgl)
     if do_nested_cv:
@@ -73,14 +78,11 @@ def reconstruction_cmds(out_dir, parts, tree_unpruned, annotation_tables, code_d
     loop(pts, cmd_strings, args_dict, fns, out_dir, range(parts), cpus)
     #TODO include traitar new
     model_names = ["%s" % i for i in modes] 
-    traitar_new = "traitar new %(out_dir)s/traitar-model_%(mode)s_out %(feature_mapping)s %(phenotype_mapping)s %(hmm_db)s %(archive_name)s"
+    traitar_new = "traitar new %(out_dir)s/traitar-model_%(mode)s%(block_cross_validation_switch)s_out %(feature_mapping)s %(phenotype_mapping)s %(anno_source)s %(archive_name)s"
     for mode, name in zip(modes, model_names):
         args_dict["mode"] = mode
         args_dict["archive_name"] = name
-        if anno_type is not None:
-            args_dict["hmm_db"] = "--hmm_name %s" % annot_type 
-        else:
-            args_dict["hmm_db"] = ""
+        args_dict["anno_source"] = anno_source 
         sys.stdout.write((traitar_new % args_dict) + "\n")
 
 if __name__ == "__main__":
@@ -98,7 +100,8 @@ if __name__ == "__main__":
     parser.add_argument("--do_nested_cv", action = 'store_true', help='do ten-fold nested cross validation rather than only simple 10-fold cross-validation')
     parser.add_argument("--cpus", type = int, help='number of cpus to be used', default = 1)
     parser.add_argument("--do_phypat_only", action = 'store_true', help='only use phyletic patterns for classification')
-    parser.add_argument("--anno_type", choices = {"pfam", "cazy"}, default = None,  help='choose between pfam, cazy if annotation data hmm-based')
+    parser.add_argument("anno_source",  help='annotation source e.g. pfam, cazy or any other hmm or non-hmm-based annotation')
     parser.add_argument("--do_normalization", action = "store_true",  help='use if using non-binary, continuous input features such as gene expression')
+    parser.add_argument("--block_cross_validation", default = None, help='table of samples assigned to groups to be used in block cross validation')
     args = parser.parse_args()
     reconstruction_cmds(**vars(args))
