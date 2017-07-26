@@ -11,12 +11,14 @@ Phenotype table: a tab separated table of samples vs. phenotypes (see example us
 ## Including a phylogenetic tree
 TraitarM can also use the tree as an additional source of information by reconstructing the evovlutionary history of the genetic features and the phenotype. TraitarM will train two additional models in this case: The phypat+PGL model, which uses both the evolutionary history as well as the observable genotype and phenotype patterns and the PGL model, which is inferred only using the genotype and phenotype gains and losses.
 
-```traitarm <out_dir> 10 <phenotype_table> <annotation_table>  <phenotype_name>   --cpus 10 --tree_unpruned <tree>```
+```traitarm <out_dir> 10 <phenotype_table> <annotation_table>  <phenotype_name>   --cpus 10 --tree_unpruned <tree>``` 
+
 The tree should be provided in Newick format and should have been computed basaed for example on a set of aligned marker genes or core-genes for the input genomic bacterial samples.
 
 ## Re-using phenotype models
 For each type of phenotype models trained (phypat, phypat+PGL and PGL) there will be a re-usable model available that can be used to predict new samples using Traitar (also see https://github.com/aweimann/traitar). Traitar by default only supports annotation using HMMSEARCH. 
 ```traitar phenotype <input_dir> <sample_table> <from_nucleotides/from_genes> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>```
+
 If you're using some other kind of annotation for instance SNPs, gene expression data or Roary, you have to ensure that the annotation is generated the same way as the training data was generated e.g. using the same SNP calling pipeline. In this case you need to use Traitar with the from_annotation and the -a option to provide a pre-computed annotation table.
 ```traitar phenotype <input_dir> <sample_table> from_annotation -a <path_to_annotation> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>```
 
