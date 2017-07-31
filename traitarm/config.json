@@ -29,6 +29,5 @@
         1
     ],
     "seed": 0,
-    "min_samples": 20,
-    "gainLoss": "~/software/GLOOME/gainLoss.VR01.266.dRep"
+    "min_samples": 20
 }

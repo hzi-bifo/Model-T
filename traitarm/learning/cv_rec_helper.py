@@ -62,14 +62,15 @@ def reconstruct_pt_likelihood(yp_train, model_out, config,   likelihood_params, 
         g.close()
         h.close()
         #execute gainLoss for that phenotype 
-        command = ["%s %s/gainLoss_params.txt"%(config['gainLoss'], gainloss_dir )]
+        command = ["gainLoss.VR01.266.dRep %s/gainLoss_params.txt"%(gainloss_dir )]
         with open(os.devnull, "w") as fnull:
-                result = subprocess.call(command,  stdout = fnull, stderr = fnull, shell = True)
+                result = subprocess.call(command, stdout = fnull, stderr = fnull, shell = True)
     #if gainloss output file does not exist, wait until some other process running in parallel creates it
     t = 0
     while not os.path.exists("%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt")):
         if t == 60:
-            sys.stderr.write("something went wrong while recomputing reconstruction in gainloss_dir %s" % gainloss_dir)
+            sys.stderr.write("%s/RESULTS/%s"%(gainloss_dir,"gainLossProbExpPerPosPerBranch.txt\n"))
+            sys.stderr.write("something went wrong while recomputing reconstruction in gainloss_dir %s\n" % gainloss_dir)
             sys.exit(1)
             break 
         time.sleep(1) 

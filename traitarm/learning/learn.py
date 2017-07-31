@@ -52,6 +52,9 @@ class pt_classification:
             is_rec_based = True
         self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation)
         #write config to disk
+        #get version
+        from traitarm._version import __version__
+        self.config['version'] =  __version__
         with open("%s/config.json" % self.model_out, 'w') as out_f:
             json.dump(self.config, out_f, indent=4, separators=(',', ': '))
         self.config['tree_f'] = tree
@@ -137,9 +140,7 @@ class pt_classification:
                 #TODO get misclassified reconstructions samples
                 miscl = y_p_t.index[(all_preds != y_p_t)]
                 #bind actual labels and predictions
-                #print miscl, y_p_t.loc[miscl], all_preds.loc[miscl]
                 miscl_plus = pd.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
-                #print miscl_plus
                 self.write_miscl(model_out, pt_out, miscl_plus)
                 #cv accuracy stats
                 cv_out = "%s/cv_acc.txt"%self.model_out
@@ -154,20 +155,6 @@ class pt_classification:
             all_preds, all_scores  = self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out, do_calibration = True)
             all_preds = pd.DataFrame(all_preds)
             all_scores = pd.DataFrame(all_scores)
-            #temporary hack to the get random generator into place
             folds = self.setup_folds_synthetic(len(x), cv_outer)
-            #folds_inner = self.setup_folds_synthetic(folds[1], 10)
-            #folds_inner_extd = self.setup_folds_synthetic(folds[3], 10)
-            #outer_subsampling = folds[0] * folds[1] + folds[2] * folds[3]
-            #inner_subsampling = folds[0] * (folds_inner[0] * folds_inner[1] + folds_inner[2] * folds_inner[3]) * (len(self.config['c_params'] )+ 1)
-            #for i in range(2 * (outer_subsampling + inner_subsampling + inner_subsampling_extd + outer_subsampling)):
-            #    random.randint(0,9)
-            #inner_subsampling_extd = folds[2] * (folds_inner_extd[0] * folds_inner_extd[1] + folds_inner_extd[2] * folds_inner_extd[3]) * (len(self.config['c_params']) + 1)
-            #additional c param
-            #for i in range(8476 * (10 + 10 * 10)):
-            #    random.randint(0,9)
-            #skip nested cv
-            #for i in range(8476 * (10 + 10 + 10 * 10 * (len(self.config['c_params']) + 1)) ):
-            #    random.randint(0,9)
             self.ncv.majority_feat_sel(x, y, x_p, y_p, all_preds, all_scores, self.config['k'], pt_out)
 

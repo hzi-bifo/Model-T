@@ -4,7 +4,6 @@ import pandas as pd
 
 def single_matrix(m, pt,  t,  outdir, discretize_pt_only = False):
     """discretize a single matrix""" 
-    print "processing file %s"%(pt)
     if discretize_pt_only:
         m.loc[m.iloc[:, m.shape[1] - 1] >= t, m.columns[m.shape[1] - 1]] = 1
     else: 
@@ -57,7 +56,7 @@ def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only 
                 if is_internal:
                     return m
                 continue
-            print "processing file %s/pt%s.dat"%(loss_dir2, pt)
+            #print "processing file %s/pt%s.dat"%(loss_dir2, pt)
             #drop condition for m1 where the pt is non-zero but does not exceed the threshold
             #join gains and losses
             if are_continuous_features:
@@ -88,9 +87,10 @@ def threshold_matrix(dir1, t, outdir, pts, loss_dir2 = None, discretize_pt_only 
             #combine the two conditions
             m = m[drop_m | (m.iloc[:,m.shape[1] - 1] >= 1)]
             if discretize_pt_only:
-                print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
-            print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
-            print "there were %s samples removed due to unclear status" % (s[0] - m.shape[0])
+                pass
+                #print "there are %s cases with probable gain and loss event for the same edge" % (m > 1).sum().sum()
+            #print "there are %s probable phenotype events" % (m.iloc[:, m.shape[1] - 1] >= 1).sum()
+            #print "there were %s samples removed due to unclear status" % (s[0] - m.shape[0])
             #TODO only write to file if the call is external i.e. in the bulk discretization run
             m.to_csv(os.path.join(outdir, "pt%s_pruned.dat" % pt), sep="\t")
             if is_internal:
