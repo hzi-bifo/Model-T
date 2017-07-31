@@ -3,10 +3,9 @@ from traitarm.traitarm import reconstruction_cmds
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser("generate summary matrix from the filtered best hmmer annotation files")
+    parser = argparse.ArgumentParser("TraitarM: Learning phenotype classification models from protein family phyletic patterns and other kinds of annotations")
     parser.add_argument("out_dir", help='output directory (will be created if it does not already exist')
-    parser.add_argument("parts", type = int, help='split the ancestral reconstruction into several parts')
-    parser.add_argument("--tree_unpruned", help='tree that will be pruned to the samples in the phenotype / annotation table')
+    parser.add_argument("--tree", default = None, help='will use tree for reconstructing the evolutionary history of the genotypes and phenotypes; will be pruned to the samples in the phenotype / annotation table')
     parser.add_argument("phenotype_table", help='phenotype table for all samples')
     parser.add_argument("--phenotype_mapping", help='')
     parser.add_argument("--feature_mapping", help='use given mapping of features to names')
@@ -14,9 +13,8 @@ if __name__ == "__main__":
     parser.add_argument("--sample_mapping", help='use given mapping of samples to names e.g. strain designations')
     parser.add_argument("--do_nested_cv", action = 'store_true', help='do ten-fold nested cross validation rather than only simple 10-fold cross-validation')
     parser.add_argument("--cpus", type = int, help='number of cpus to be used', default = 1)
-    parser.add_argument("--do_phypat_only", action = 'store_true', help='only use phyletic patterns for classification')
     parser.add_argument("anno_source",  help='annotation source e.g. pfam, cazy or any other hmm or non-hmm-based annotation')
-    parser.add_argument("--do_normalization", action = "store_true",  help='use if using non-binary, continuous input features such as gene expression')
+    parser.add_argument("--do_standardization", action = "store_true",  help='use if using non-binary, continuous input features such as gene expression')
     parser.add_argument("--block_cross_validation", default = None, help='table of samples assigned to groups to be used in block cross validation')
     args = parser.parse_args()
     reconstruction_cmds(**vars(args))
