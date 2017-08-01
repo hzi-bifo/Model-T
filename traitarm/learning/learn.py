@@ -151,7 +151,8 @@ class pt_classification:
                     f.write('%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc, precision, f1_score))
                     f.flush()
                 #auc/roc 
-                self.ncv.roc_curve(y_p, all_scores, "%s/%s_roc_curve.png" % (self.model_out, pt_out), pos_acc, 1 - neg_acc)
+                auc = self.ncv.roc_curve(y_p, all_scores, "%s/%s_roc_curve.png" % (self.model_out, pt_out), pos_acc, 1 - neg_acc)
+                print "auc ", auc
             all_preds, all_scores  = self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out, do_calibration = True)
             all_preds = pd.DataFrame(all_preds)
             all_scores = pd.DataFrame(all_scores)
