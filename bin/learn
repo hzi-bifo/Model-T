@@ -21,7 +21,7 @@ if __name__=="__main__":
     parser.add_argument("--tree", default = None, help='tree for the likelihood reconstruction')
     parser.add_argument("--tree_named", default = None, help='named tree for the likelihood reconstruction')
     parser.add_argument("--is_phypat_and_rec", action = "store_true", help='only use if in reconstruction classification i.e. option likelihood_params is set as well; training will be done on the gains and losses and the phyletic patterns')
-    parser.add_argument("--do_normalization",  action = "store_true", help = "use raw data with normalization and don't binarize")
+    parser.add_argument("--do_standardization",  action = "store_true", help = "use raw data with standardization and don't binarize")
     parser.add_argument("--perc_feats", default = 1.0, type = int, help = "percent of features to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included")
     parser.add_argument("--perc_samples", default = 1.0, type = int, help = "percent of samples to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all samples included")
     parser.add_argument("--inverse_feats", action = "store_true", help = "if option set, extend the feature space in the classification by the inverse features (1-X) to get rid of noise features")
@@ -50,4 +50,4 @@ if __name__=="__main__":
             os.mkdir(a.out)
         except OSError:
             pass
-    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, ids2name = a.ids2name, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_normalization = a.do_normalization, resume = a.resume, consider_in_recon = a.consider_in_recon, with_seed = a.with_seed, tree = a.tree, tree_named = a.tree_named, is_discrete_phenotype_with_continuous_features = a.is_discrete_phenotype_with_continuous_features, block_cross_validation = a.block_cross_validation) 
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, ids2name = a.ids2name, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_standardization = a.do_standardization, resume = a.resume, consider_in_recon = a.consider_in_recon, with_seed = a.with_seed, tree = a.tree, tree_named = a.tree_named, is_discrete_phenotype_with_continuous_features = a.is_discrete_phenotype_with_continuous_features, block_cross_validation = a.block_cross_validation) 

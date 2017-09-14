@@ -31,7 +31,7 @@ class pt_classification:
     
 
     
-    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, ids2name, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_normalization, resume, tree, tree_named, parsimony_params = None, consider_in_recon = None, with_seed = False, is_discrete_phenotype_with_continuous_features = False, block_cross_validation = None):
+    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, ids2name, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_standardization, resume, tree, tree_named, parsimony_params = None, consider_in_recon = None, with_seed = False, is_discrete_phenotype_with_continuous_features = False, block_cross_validation = None):
         """main routine to prepare data for classification and feature selection"""
         if with_seed:
             random.seed(0)
@@ -50,7 +50,7 @@ class pt_classification:
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
-        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation)
+        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_standardization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation)
         #write config to disk
         #get version
         from traitarm._version import __version__
@@ -94,7 +94,7 @@ class pt_classification:
                 #we are in pure phyletic pattern mode
                 x = x_p
                 y = y_p
-            if not do_normalization:
+            if not do_standardization:
                 #binarize
                 x_p = (x_p > 0).astype('int')
                 if likelihood_params is None:
@@ -142,16 +142,17 @@ class pt_classification:
                 #bind actual labels and predictions
                 miscl_plus = pd.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
                 self.write_miscl(model_out, pt_out, miscl_plus)
+                auc = self.ncv.roc_curve(y_p, all_scores, "%s/%s_roc_curve.png" % (self.model_out, pt_out), pos_acc, 1 - neg_acc)
                 #cv accuracy stats
                 cv_out = "%s/cv_acc.txt"%self.model_out
                 with open(cv_out, "a") as f:
                     if not os.path.exists(cv_out):
-                        f.write('\tpos_recall\tneg_recall\tbalanced_accuracy\tprecision\tf1-score\n')
+                        f.write('\tpos_recall\tneg_recall\tbalanced_accuracy\tprecision\tf1-score\tauc\n')
                 with open(cv_out, "a") as f:
-                    f.write('%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc, precision, f1_score))
+                    f.write('%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc, precision, f1_score, auc))
                     f.flush()
                 #auc/roc 
-                self.ncv.roc_curve(y_p, all_scores, "%s/%s_roc_curve.png" % (self.model_out, pt_out), pos_acc, 1 - neg_acc)
+                print "auc ", auc
             all_preds, all_scores  = self.ncv.outer_cv(x,y, x_p = x_p, y_p = y_p, pt_out = pt_out, do_calibration = True)
             all_preds = pd.DataFrame(all_preds)
             all_scores = pd.DataFrame(all_scores)

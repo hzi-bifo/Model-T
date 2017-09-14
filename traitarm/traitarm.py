@@ -12,7 +12,7 @@ def execute_commands(commands):
         return
     #run in sequential order
     for i in commands:
-        p = Popen(i,  stdout = devnull, shell = True,  executable = "/bin/bash", stdin = PIPE)
+        p = Popen(i,   shell = True,  executable = "/bin/bash", stdin = PIPE)
         p.communicate(input = i)
         if p.returncode != 0:
             sys.stderr.write("Non-zero exit value; command %s failed\n" % i) 
@@ -50,7 +50,7 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
         fns = ["mkdir.sh", "write_config.sh", "gainLoss.sh", "beml_gain.sh", "beml_loss.sh"]
         cmd_strings = ["mkdir -p %(out_dir)s/run_%(part)s",
                     "write_gainLoss_config   %(out_dir)s/in_%(part)s.fasta %(out_dir)s/tree.tre %(out_dir)s/out_%(part)s %(out_dir)s/gainLoss_param%(part)s.txt",
-                    "gainLoss.VR01.266.dRep %(out_dir)s/gainLoss_param%(part)s.txt",
+                    "gainLoss.VR01.266.dRep %(out_dir)s/gainLoss_param%(part)s.txt > /dev/null",
                     "build_edge_matrix_likelihood %(out_dir)s/tree_named.tre %(out_dir)s/annot_pheno.dat  %(out_dir)s/out_%(part)s/gainLossProbExpPerPosPerBranch.txt %(out_dir)s/in_%(part)s_feats.txt %(out_dir)s/%(phenotypes)s  %(out_dir)s/pgl_matrix_gain_%(part)s",
                     "build_edge_matrix_likelihood %(out_dir)s/tree_named.tre %(out_dir)s/annot_pheno.dat  %(out_dir)s/out_%(part)s/gainLossProbExpPerPosPerBranch.txt %(out_dir)s/in_%(part)s_feats.txt %(out_dir)s/%(phenotypes)s %(out_dir)s/pgl_matrix_loss_%(part)s --consider_loss_events"]
         loop(range(cpus), cmd_strings, args_dict, fns, out_dir, range(cpus), cpus, cmds)
@@ -93,7 +93,7 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
         cmd_strings.append(learn_pgl)
     if do_nested_cv:
         #add nested cv parameter
-        cmd_strings = [i + " --cv_inner 10" for i in cmd_strings]
+        cmd_strings = [i + " --cv_inner 3" for i in cmd_strings]
     loop(pts, cmd_strings, args_dict, fns, out_dir, range(cpus), cpus, cmds)
     model_names = ["%s_%s" % (anno_source, i) for i in modes] 
     traitar_new = "traitar new %(out_dir)s/traitar-model_%(mode)s%(block_cross_validation_switch)s_out %(feature_mapping)s %(phenotype_mapping)s %(anno_source)s %(archive_name)s"
