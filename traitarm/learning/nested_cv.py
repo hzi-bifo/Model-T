@@ -35,11 +35,11 @@ import os
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_normalization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation):
+    def __init__(self, likelihood_params, parsimony_params, do_standardization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
-        self.do_normalization = do_normalization
+        self.do_standardization = do_standardization
         self.is_rec_based = is_rec_based
         self.n_jobs = n_jobs
         self.inverse_feats = inverse_feats
@@ -237,7 +237,7 @@ class nested_cv:
                 if self.inverse_feats:
                     #add inverse features
                     X = pd.concat([X,1-X], axis = 1) 
-                if self.do_normalization:
+                if self.do_standardization:
                     X, scaler = self.normalize(X)
                 y = pd.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
                 predictor.fit(X = X, y = y)
@@ -248,7 +248,7 @@ class nested_cv:
                 if self.inverse_feats:
                     #add inverse features
                     x_train_sub = pd.concat([x_train_sub, 1 - x_train_sub], axis = 1) 
-                if self.do_normalization:
+                if self.do_standardization:
                     #if reconstruction based use absolute change for prediction
                     if self.is_rec_based:
                         x_train_sub, scaler = self.normalize(x_train_sub.abs())
@@ -264,7 +264,7 @@ class nested_cv:
                     xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
                     xp_train_sub_t = xp_train_sub.copy()
                     xp_train_sub_t.loc[:, ~models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
-                    if self.do_normalization:
+                    if self.do_standardization:
                         xp_train_sub_t, scaler = self.normalize(xp_train_sub_t)
                     predictor.fit(xp_train_sub_t, yp_train_t_sub)
                 #probability calibration
@@ -281,7 +281,7 @@ class nested_cv:
                 #add inverse features to test sample
                 x_test_sample = pd.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
             #normalize test sample
-            if self.do_normalization:
+            if self.do_standardization:
                 x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
             #use calibration classifier
@@ -564,7 +564,7 @@ class nested_cv:
                     if self.inverse_feats:
                         X = pd.concat([X, 1 - X], axis = 1)
                     #normalize if the corresponding option is set
-                    if self.do_normalization:
+                    if self.do_standardization:
                         X, _ = self.normalize(X)
                         pass
                     #Start EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
@@ -576,7 +576,7 @@ class nested_cv:
                         #add inverse features
                         x_sub =  pd.concat([x_sub, x_sub], axis = 1)
                     #normalize if , reduce = Truethe corresponding option is set
-                    if self.do_normalization:
+                    if self.do_standardization:
                         x_sub, _ = self.normalize(x_sub.abs())
                         #x_sub = x_sub.abs()
                         pass
@@ -588,7 +588,7 @@ class nested_cv:
                         xp_sub = x_p.loc[sample_samples_p, sample_feats]
                         xp_sub_t = xp_sub.copy()
                         xp_sub_t.loc[:, ~models_t.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
-                        if self.do_normalization:
+                        if self.do_standardization:
                             xp_sub_t, _ = self.normalize(xp_sub_t) 
                         y_p_t_sub = y_p_t.loc[sample_samples_p]
                         predictor.fit(xp_sub_t, y_p_t_sub)
@@ -611,15 +611,15 @@ class nested_cv:
         #prepare performance statistics
         rownames = [baccs_s[i][5] for i in range(k)] 
         colnames = ['bacc', "pos_rec", "neg_rec", "precision", "F1-score"]
-        baccs_s_np = np.array(baccs_s)[0:k, :5].T
-        baccs_s_np_p = pd.DataFrame(baccs_s_np, index = rownames, columns = colnames)
+        baccs_s_np = np.array(baccs_s)[:k, :5].T
+        baccs_s_np_p = pd.DataFrame(baccs_s_np, index = colnames, columns = rownames)
         #roc curves / auc
         all_scores.columns = self.config['c_params']
         auc_df = pd.DataFrame(pd.np.zeros(k), index = rownames, columns = ['auc'])
         for c_param, pos_rec, neg_rec in [(baccs_s[i][5], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
             auc_df.loc[c_param] = self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
         #add auc to performance summary
-        baccs_s_np_p = pd.concat([baccs_s_np_p, auc_df], axis = 1)
+        baccs_s_np_p = pd.concat([baccs_s_np_p, auc_df.T], axis = 0)
         #write them to disk
         baccs_s_np_p.to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f')
         #determine features with non-zero weights
@@ -634,7 +634,7 @@ class nested_cv:
             models_df[models_df.columns[i]] = models_df[models_df.columns[i]].map(lambda x: '%.3f' % x)
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #standardize the features and write standardization parameters to disk
-        if self.do_normalization:
+        if self.do_standardization:
             _, scaler = self.normalize(x_p)
             scale_df = pd.DataFrame(scaler.scale_, index = x_p.columns, columns = ["scale"]).to_csv("%s/%s_scale.txt" % (self.model_out, pt_out), sep = "\t")
             scale_df = pd.DataFrame(scaler.mean_, index = x_p.columns, columns = ["mean"]).to_csv("%s/%s_mean.txt" % (self.model_out, pt_out), sep = "\t")
