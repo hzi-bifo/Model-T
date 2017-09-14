@@ -127,12 +127,28 @@ class nested_cv:
         if (TP + FP) == 0:
             return 0
         return TP / float(TP + FP)   
+    
+    @staticmethod 
+    def ppv(y, y_pred):
+        """compute precision"""
+        FN = (y[y == 1] != y_pred[y == 1]).sum()
+        TN = (y[y == -1] == y_pred[y == -1]).sum()
+        if (TN + FN) == 0:
+            return 0
+        return TN / float(TN + FN)   
 
     @staticmethod 
     def f1_score(recall, precision):
         """compute f1-measure"""
         if (precision + recall) != 0:
             return 2 * (precision * recall) / (precision + recall)    
+        return 0
+    
+    @staticmethod 
+    def f1_score_neg(recall_neg, ppv):
+        """compute negative f1-measure"""
+        if (precision + recall) != 0:
+            return 2 * (ppv * recall_neg) / (ppv + recall_neg)    
         return 0
 
     @staticmethod 
@@ -516,10 +532,13 @@ class nested_cv:
         recns = [self.recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
         #precision
         precs = [self.precision(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
+        #positive predictive value
+        ppvs = [self.ppv(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
         #f1 score
         f1_scores = [self.f1_score(recall, precision) for recall, precision in zip(recps, precs)]
+        f1_scores_neg = [self.f1_score(recall_neg, ppv) for recall_neg, ppv in zip(recns, ppvs)]
         #sort values of the C params tested according to balanced accuracy achieved
-        baccs_s = sorted(((baccs[i], recps[i], recns[i], precs[i], f1_scores[i], self.config['c_params'][i]) for i in range(len(self.config['c_params']))), key=itemgetter(0), reverse=True )
+        baccs_s = sorted(((baccs[i], recps[i], recns[i], precs[i], f1_scores[i], f1_scores_neg[i], self.config['c_params'][i]) for i in range(len(self.config['c_params']))), key=itemgetter(0), reverse=True )
         predictors = []
         #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
@@ -606,21 +625,21 @@ class nested_cv:
         feats = []
         #prepare performance statistics
         rownames = [baccs_s[i][5] for i in range(k)] 
-        colnames = ['bacc', "pos_rec", "neg_rec", "precision", "F1-score"]
-        baccs_s_np = np.array(baccs_s)[0:k, :5].T
-        baccs_s_np_p = pd.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(5)))
+        colnames = ['bacc', "pos-rec", "neg-rec", "precision", "F1-score", "neg-F1-score"]
+        baccs_s_np = np.array(baccs_s)[0:k, :6].T
+        baccs_s_np_p = pd.DataFrame(baccs_s_np).rename(dict((i,colnames[i]) for i in range(len(colnames))))
         #write them to disk
         pd.DataFrame(baccs_s_np_p).to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f',  header=rownames)
         #roc curves
         all_scores.columns = self.config['c_params']
-        for c_param, pos_rec, neg_rec in [(baccs_s[i][5], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
+        for c_param, pos_rec, neg_rec in [(baccs_s[i][6], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
             self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
         #determine features with non-zero weights
         for i in range(models.shape[0]):
             if sum(models.loc[models.index[i],:] != 0) > 1:
                 feats.append(models.index[i])
         #write all the features with their weights to disk
-        rownames_extd = [str(baccs_s[i][5]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
+        rownames_extd = [str(baccs_s[i][6]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
         models_df = pd.DataFrame(models)
         models_df.columns = rownames_extd
         for i in range(k):
