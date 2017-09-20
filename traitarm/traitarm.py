@@ -32,7 +32,7 @@ def loop(parts, cmd_strings, args_dict, fns, out_dir, jobs, cpus, cmds):
     for fn in fns:
         cmds.append("cat %s/%s | parallel -j %s\n" % (out_dir, fn, cpus))
 
-def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, cpus, anno_source, do_standardization, block_cross_validation):
+def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, cpus, anno_source, do_standardization, block_cross_validation, opt_measure):
     """Traitar-Model master method: collect the individual command strings and execute the pipeline"""
     cmds = []
     if not os.path.exists(out_dir):
@@ -70,6 +70,8 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
             args_dict[n] = "%s/%s" % (out_dir, df)    
         else:
             args_dict[n] = m    
+    
+    args_dict['opt_measure'] = opt_measure 
     if do_standardization:
         args_dict['do_standardization'] = '--do_standardization'
     else:
@@ -80,15 +82,15 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
     else:
         args_dict['block_cross_validation'] = ''
         args_dict['block_cross_validation_switch'] = ''
-    learn_phypat = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --with_seed --resume %(do_standardization)s %(block_cross_validation)s"
+    learn_phypat = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --with_seed --resume %(do_standardization)s %(block_cross_validation)s --opt_measure %(opt_measure)s"
     cmd_strings = [learn_phypat] 
     #prediction mode
     modes = ["observed"]
     if not tree is None: 
         modes = modes + ["observed+evo", "evo"]
         fns = fns + ["learn_observed+evo.sh", "learn_evo.sh"]
-        learn_phypat_pgl = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed+evo%(block_cross_validation_switch)s_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --is_phypat_and_rec --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s"
-        learn_pgl =  "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_evo_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s  --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s" 
+        learn_phypat_pgl = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed+evo%(block_cross_validation_switch)s_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --is_phypat_and_rec --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s --opt_measure %(opt_measure)s"
+        learn_pgl =  "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_evo_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s  --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s --opt_measure %(opt_measure)s" 
         cmd_strings.append(learn_phypat_pgl)
         cmd_strings.append(learn_pgl)
     if do_nested_cv:

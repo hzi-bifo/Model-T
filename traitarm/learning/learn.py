@@ -31,7 +31,7 @@ class pt_classification:
     
 
     
-    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, ids2name, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_standardization, resume, tree, tree_named, parsimony_params = None, consider_in_recon = None, with_seed = False, is_discrete_phenotype_with_continuous_features = False, block_cross_validation = None):
+    def __init__(self, config_f, model_out, pf2acc_desc_f, pt2acc_f, phypat_f, ids2name, rec_dir, likelihood_params, is_phypat_and_rec, cv_outer, cv_inner, n_jobs, perc_samples, perc_feats, inverse_feats, do_standardization, resume, tree, tree_named, parsimony_params = None, consider_in_recon = None, with_seed = False, is_discrete_phenotype_with_continuous_features = False, block_cross_validation = None, opt_measure = "bacc"):
         """main routine to prepare data for classification and feature selection"""
         if with_seed:
             random.seed(0)
@@ -50,7 +50,7 @@ class pt_classification:
         is_rec_based = False
         if not rec_dir is None:
             is_rec_based = True
-        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_standardization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation)
+        self.ncv = ncv.nested_cv(likelihood_params, parsimony_params, do_standardization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, self.config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2acc_desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation, opt_measure)
         #write config to disk
         #get version
         from traitarm._version import __version__
@@ -135,9 +135,12 @@ class pt_classification:
                 print "balanced acc", bacc
                 precision = self.ncv.precision(y_p_t, all_preds)
                 print "precision", precision 
+                ppv = self.ncv.ppv(y_p_t, all_preds)
+                print "positive predictive value", ppv 
                 f1_score = self.ncv.f1_score(precision, pos_acc)
                 print "f1_score", f1_score
-                #TODO get misclassified reconstructions samples
+                neg_f1_score = self.ncv.f1_score_neg(ppv, neg_acc)
+                print "negative f1_score", neg_f1_score
                 miscl = y_p_t.index[(all_preds != y_p_t)]
                 #bind actual labels and predictions
                 miscl_plus = pd.concat([y_p_t.loc[miscl], all_preds.loc[miscl]], axis = 1)
@@ -147,7 +150,7 @@ class pt_classification:
                 cv_out = "%s/cv_acc.txt"%self.model_out
                 with open(cv_out, "a") as f:
                     if not os.path.exists(cv_out):
-                        f.write('\tpos_recall\tneg_recall\tbalanced_accuracy\tprecision\tf1-score\tauc\n')
+                        f.write('\tpos_recall\tneg_recall\tbalanced_accuracy\tprecision\tppv\tf1-score\tneg-f1-score\tauc\n')
                 with open(cv_out, "a") as f:
                     f.write('%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc, precision, f1_score, auc))
                     f.flush()

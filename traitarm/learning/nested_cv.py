@@ -35,7 +35,7 @@ import os
 
 class nested_cv:
 
-    def __init__(self, likelihood_params, parsimony_params, do_standardization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation):
+    def __init__(self, likelihood_params, parsimony_params, do_standardization, is_rec_based, is_phypat_and_rec, n_jobs, inverse_feats, config, perc_feats, perc_samples, model_out, cv_outer, resume, pf2desc_f, consider_in_recon, is_discrete_phenotype_with_continuous_features, block_cross_validation, opt_measure):
         self.config = config
         self.likelihood_params = likelihood_params
         self.parsimony_params = parsimony_params
@@ -52,6 +52,7 @@ class nested_cv:
         self.pf2desc_f = pf2desc_f
         self.consider_in_recon = consider_in_recon
         self.is_discrete_phenotype_with_continuous_features  = is_discrete_phenotype_with_continuous_features
+        self.opt_measure = opt_measure
         if block_cross_validation is not None:
             self.block_cross_validation = pd.read_csv(block_cross_validation, index_col = 0, sep = "\t")
         else:
@@ -150,7 +151,7 @@ class nested_cv:
     @staticmethod 
     def f1_score_neg(recall_neg, ppv):
         """compute negative f1-measure"""
-        if (precision + recall) != 0:
+        if (ppv + recall_neg) != 0:
             return 2 * (ppv * recall_neg) / (ppv + recall_neg)    
         return 0
 
@@ -473,9 +474,9 @@ class nested_cv:
                 #copy yp train and change the negative labels from 0 to -1
                 yp_t_t = yp_train.copy()
                 yp_t_t[yp_t_t == 0] = -1
-                baccs = [self.bacc(self.recall_pos(yp_t_t, all_preds.iloc[:,j]), self.recall_neg(yp_t_t, all_preds.iloc[:,j])) for j in range(len(self.config['c_params']))]
-                #print baccs, "baccs"
-                c_opt = self.config['c_params'][np.argmax(np.array(baccs))]
+                perf_m = self.perf_evaluation(yp_t_t, all_preds)
+                perf_m = perf_m.sort_values(by = self.opt_measure, axis = 1, ascending = False)
+                c_opt = perf_m.columns[0]
                 #print c_opt, "optimal value of the C param is this fold"
                 #use that C param to train a classifier to predict the left out samples in the outer cv
                 p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10, do_calibration = do_calibration)
@@ -499,6 +500,26 @@ class nested_cv:
                 #print scores
         return all_preds, all_scores
         
+    def perf_evaluation(self, gold_standard, predictions):
+        """evaluate different performance measures"""
+        colnames = ['bacc', "pos-rec", "neg-rec", "precision", "F1-score", "neg-F1-score"]
+        perf_m = pd.DataFrame(pd.np.zeros((len(colnames), len(self.config['c_params']))), index = colnames, columns = self.config['c_params'])
+        for j in range(len(self.config['c_params'])):
+            c_param = self.config['c_params'][j]
+            #recall of pt positive class
+            perf_m.loc['pos-rec', c_param] = self.recall_pos(gold_standard, predictions.iloc[:,j]) 
+            #recall of pt negative class
+            perf_m.loc['neg-rec', c_param] =  self.recall_neg(gold_standard, predictions.iloc[:,j]) 
+            #balanced accuracy
+            perf_m.loc['bacc', c_param] = self.bacc(perf_m.loc['pos-rec', c_param], perf_m.loc['neg-rec', c_param])
+            #precision
+            perf_m.loc['precision', c_param] = self.precision(gold_standard, predictions.iloc[:,j]) 
+            #positive predictive value
+            perf_m.loc['ppv', c_param] = self.ppv(gold_standard, predictions.iloc[:,j]) 
+            #f1 score
+            perf_m.loc['F1-score', c_param] = self.f1_score(perf_m.loc['pos-rec', c_param], perf_m.loc['precision', c_param]) 
+            perf_m.loc['neg-F1-score', c_param] = self.f1_score(perf_m.loc['neg-rec', c_param], perf_m.loc['ppv', c_param]) 
+        return perf_m
         
     def majority_feat_sel(self, x, y, x_p, y_p, all_preds, all_scores, k, pt_out, no_classifier = 10):
         """determine the features occuring in the majority of the k best models"""
@@ -518,6 +539,7 @@ class nested_cv:
             y = y.loc[condition]
             x = x.loc[condition, :]
         #determine the k best classifiers
+        #make sure the indices match
         all_preds.index = y_p.index
         x.columns = x_p.columns
         y.index = x.index
@@ -527,22 +549,19 @@ class nested_cv:
         y_p_t[y_p_t == 0] = -1
         y_t = y.copy()
         y_t[y_t == 0] = -1
-        #compute balanced accuracy, positive and negative recall
-        #balanced accuracy
-        baccs = [self.bacc(self.recall_pos(y_p_t, all_preds.iloc[:,j]), self.recall_neg(y_p_t, all_preds.iloc[:,j])) for j in range(len(self.config['c_params']))]
-        #recall of pt positive class
-        recps = [self.recall_pos(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
-        #recall of pt negative class
-        recns = [self.recall_neg(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
-        #precision
-        precs = [self.precision(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
-        #positive predictive value
-        ppvs = [self.ppv(y_p_t, all_preds.iloc[:,j]) for j in range(len(self.config['c_params']))]
-        #f1 score
-        f1_scores = [self.f1_score(recall, precision) for recall, precision in zip(recps, precs)]
-        f1_scores_neg = [self.f1_score(recall_neg, ppv) for recall_neg, ppv in zip(recns, ppvs)]
-        #sort values of the C params tested according to balanced accuracy achieved
-        baccs_s = sorted(((baccs[i], recps[i], recns[i], precs[i], f1_scores[i], f1_scores_neg[i], self.config['c_params'][i]) for i in range(len(self.config['c_params']))), key=itemgetter(0), reverse=True )
+        #prepare performance statistics
+        perf_m = self.perf_evaluation(y_p_t, all_preds)
+        #sort by optimal  measure
+        perf_m_k = perf_m.sort_values(by = self.opt_measure, axis = 1, ascending = False).iloc[:, :k]
+        #roc curves / auc
+        all_scores.columns = self.config['c_params']
+        auc_df = pd.DataFrame(pd.np.zeros(k), index = perf_m_k.columns, columns = ['auc'])
+        for c_param, pos_rec, neg_rec in [(perf_m_k.columns[i], perf_m_k.loc['pos-rec'].iloc[i], perf_m_k.loc['neg-rec'].iloc[i])  for i in range(k)]:
+            auc_df.loc[c_param] = self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
+        #add auc to performance summary
+        perf_m = pd.concat([perf_m, auc_df.T], axis = 0)
+        #write them to disk
+        perf_m_k.to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f')
         predictors = []
         #check if we are in vanilla linear SVM and set no_classifiers to 1 if so or in subspace mode 
         if self.perc_feats == 1.0 and self.perc_samples == 1.0:
@@ -563,7 +582,7 @@ class nested_cv:
         #END EXPERIMENTAL
         bias_cparams = []
         for i in range(k):
-            predictor = svm.LinearSVC(C=baccs_s[i][3])
+            predictor = svm.LinearSVC(C=perf_m_k.columns[i])
             predictor.set_params(**self.config["liblinear_params"])
             #subset the features
             sample_feats = sorted(random.sample(x.columns, int(math.floor(x.shape[1] * self.perc_feats))))
@@ -627,26 +646,12 @@ class nested_cv:
             bias_cparams.append((predictor.C, predictor.intercept_[0]))
         pd.DataFrame(bias_cparams).to_csv("%s/%s_bias.txt"%(self.model_out,pt_out), sep = "\t", index = None, header = None)
         feats = []
-        #prepare performance statistics
-        rownames = [baccs_s[i][6] for i in range(k)] 
-        colnames = ['bacc', "pos-rec", "neg-rec", "precision", "F1-score", "neg-F1-score"]
-        baccs_s_np = np.array(baccs_s)[:k, :6].T
-        baccs_s_np_p = pd.DataFrame(baccs_s_np, index = colnames, columns = rownames)
-        #roc curves / auc
-        all_scores.columns = self.config['c_params']
-        auc_df = pd.DataFrame(pd.np.zeros(k), index = rownames, columns = ['auc'])
-        for c_param, pos_rec, neg_rec in [(baccs_s[i][6], baccs_s[i][1], baccs_s[i][2])  for i in range(k)]:
-            auc_df.loc[c_param] = self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
-        #add auc to performance summary
-        baccs_s_np_p = pd.concat([baccs_s_np_p, auc_df.T], axis = 0)
-        #write them to disk
-        baccs_s_np_p.to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f')
         #determine features with non-zero weights
         for i in range(models.shape[0]):
             if sum(models.loc[models.index[i],:] != 0) > 1:
                 feats.append(models.index[i])
         #write all the features with their weights to disk
-        rownames_extd = [str(baccs_s[i][6]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
+        rownames_extd = [str(perf_m_k.columns[i]) + "_" + str(l) for i in range(k) for l in range(no_classifier)] 
         models_df = pd.DataFrame(models)
         models_df.columns = rownames_extd
         for i in range(k):
@@ -689,6 +694,7 @@ class nested_cv:
         phn_f = pd.read_csv(self.config["phyn_f"], sep = "\t", index_col = 0)
         phn_f.index = phn_f.index.astype('string')
         phn_name2id = pd.read_csv(self.config["phyn_f"], sep = "\t", index_col = 1)
+        phn_name2id.index = phn_name2id.index.astype('string')
         target_df.index = phn_f.loc[target_df.index, :].iloc[:, 0]
         target_df.index.name = ""
         seaborn.set()

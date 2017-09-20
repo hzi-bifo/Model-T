@@ -30,6 +30,7 @@ if __name__=="__main__":
     parser.add_argument("--consider_in_recon",  default = [], help = 'list of samples that are only contained with a phyletic pattern but not in the tree') 
     parser.add_argument("--n_jobs", type = int, default = 1, help = "number of jobs that shall be used")
     parser.add_argument("--block_cross_validation", help='a table with group assignments for each sample')
+    parser.add_argument("--opt_measure", default = "bacc", choices = ["bacc", "F1-score", "neg-F1-score"], help='select measure for parameter optimization')
     #Deprecated parsimony option
     #-a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
     #parsimony_params = None
@@ -50,4 +51,4 @@ if __name__=="__main__":
             os.mkdir(a.out)
         except OSError:
             pass
-    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, ids2name = a.ids2name, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_standardization = a.do_standardization, resume = a.resume, consider_in_recon = a.consider_in_recon, with_seed = a.with_seed, tree = a.tree, tree_named = a.tree_named, is_discrete_phenotype_with_continuous_features = a.is_discrete_phenotype_with_continuous_features, block_cross_validation = a.block_cross_validation) 
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, ids2name = a.ids2name, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_standardization = a.do_standardization, resume = a.resume, consider_in_recon = a.consider_in_recon, with_seed = a.with_seed, tree = a.tree, tree_named = a.tree_named, is_discrete_phenotype_with_continuous_features = a.is_discrete_phenotype_with_continuous_features, block_cross_validation = a.block_cross_validation, opt_measure = a.opt_measure) 
