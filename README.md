@@ -3,15 +3,16 @@ Learning phenotype classification models from protein family phyletic patterns a
 # Basic usage
 ```
 traitarm -h #show TraitarM help
-traitarm <out_dir> <phenotype_table> <annotation_table>  <phenotype_name> --do_phypat_only --cpus <#CPUs>
+traitarm <out_dir> <phenotype_table> <annotation_table>  <phenotype_name> --cpus <#CPUs>
 ```
 Annotation table: a tab separated table of samples (one sample per row) vs. annotation (one feature per columns) as for example produced by ``traitar annotate`` (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/dbcan_annot.txt).
+
 Phenotype table: a tab separated table of samples vs. phenotypes (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/pbd.txt). Use 0 to code the phenotype-negative class, 1 for the phenotype-positive class and ? for missing phenotype labels.
 
 ## Including a phylogenetic tree
 TraitarM can also use the tree as an additional source of information by reconstructing the evovlutionary history of the genetic features and the phenotype. TraitarM will train two additional models in this case: The phypat+PGL model, which uses both the evolutionary history as well as the observable genotype and phenotype patterns and the PGL model, which is inferred only using the genotype and phenotype gains and losses.
 
-```traitarm <out_dir> 10 <phenotype_table> <annotation_table>  <phenotype_name>   --cpus 10 --tree_unpruned <tree>``` 
+```traitarm <out_dir> 10 <phenotype_table> <annotation_table>  <phenotype_name>   --cpus 10 --tree <tree>``` 
 
 The tree should be provided in Newick format and should have been computed basaed for example on a set of aligned marker genes or core-genes for the input genomic bacterial samples.
 
