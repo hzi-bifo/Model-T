@@ -1,8 +1,8 @@
-# TraitarM
+# Traitar-Model
 Learning phenotype classification models from protein family phyletic patterns and other kinds of annotations 
 # Basic usage
 ```
-traitarm -h #show TraitarM help
+traitarm -h #show Traitar-Model help
 traitarm <out_dir> <phenotype_table> <annotation_table>  <phenotype_name> --cpus <#CPUs>
 ```
 Annotation table: a tab separated table of samples (one sample per row) vs. annotation (one feature per columns) as for example produced by ``traitar annotate`` (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/dbcan_annot.txt).
@@ -10,7 +10,7 @@ Annotation table: a tab separated table of samples (one sample per row) vs. anno
 Phenotype table: a tab separated table of samples vs. phenotypes (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/pbd.txt). Use 0 to code the phenotype-negative class, 1 for the phenotype-positive class and ? for missing phenotype labels.
 
 ## Including a phylogenetic tree
-TraitarM can also use the tree as an additional source of information by reconstructing the evovlutionary history of the genetic features and the phenotype. TraitarM will train two additional models in this case: The phypat+PGL model, which uses both the evolutionary history as well as the observable genotype and phenotype patterns and the PGL model, which is inferred only using the genotype and phenotype gains and losses.
+Traitar-Model can also use the tree as an additional source of information by reconstructing the evovlutionary history of the genetic features and the phenotype. Traitar-Model will train two additional models in this case: The phypat+PGL model, which uses both the evolutionary history as well as the observable genotype and phenotype patterns and the PGL model, which is inferred only using the genotype and phenotype gains and losses.
 
 ```traitarm <out_dir> 10 <phenotype_table> <annotation_table>  <phenotype_name>   --cpus 10 --tree <tree>``` 
 
