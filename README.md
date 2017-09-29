@@ -1,8 +1,8 @@
-# Traitar-Model
+# Model-T
 Learning phenotype classification models from protein family phyletic patterns and other kinds of annotations 
 # Basic usage
 ```
-traitarm -h #show Traitar-Model help
+traitarm -h #show Model-T help
 traitarm <out_dir> <phenotype_table> <annotation_table>  <phenotype_name> --cpus <#CPUs>
 ```
 Annotation table: a tab separated table of samples (one sample per row) vs. annotation (one feature per columns) as for example produced by ``traitar annotate`` (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/dbcan_annot.txt).
