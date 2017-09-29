@@ -1,5 +1,18 @@
 # Model-T
 Learning phenotype classification models from protein family phyletic patterns and other kinds of annotations 
+# Installation
+Model-T is available via anaconda / bioconda: Install by 
+
+```conda install model-t``` 
+
+Be sure to add the bioconda channel as described on the bioconda website:
+
+```
+conda config --add channels defaults
+conda config --add channels conda-forge
+conda config --add channels bioconda
+```
+
 # Basic usage
 ```
 traitarm -h #show Model-T help
