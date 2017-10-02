@@ -133,7 +133,7 @@ class nested_cv:
         return TP / float(TP + FP)   
     
     @staticmethod 
-    def ppv(y, y_pred):
+    def npv(y, y_pred):
         """compute precision"""
         FN = (y[y == 1] != y_pred[y == 1]).sum()
         TN = (y[y == -1] == y_pred[y == -1]).sum()
@@ -149,10 +149,10 @@ class nested_cv:
         return 0
     
     @staticmethod 
-    def f1_score_neg(recall_neg, ppv):
+    def f1_score_neg(recall_neg, npv):
         """compute negative f1-measure"""
-        if (ppv + recall_neg) != 0:
-            return 2 * (ppv * recall_neg) / (ppv + recall_neg)    
+        if (npv + recall_neg) != 0:
+            return 2 * (npv * recall_neg) / (npv + recall_neg)    
         return 0
 
     @staticmethod 
@@ -514,11 +514,11 @@ class nested_cv:
             perf_m.loc['bacc', c_param] = self.bacc(perf_m.loc['pos-rec', c_param], perf_m.loc['neg-rec', c_param])
             #precision
             perf_m.loc['precision', c_param] = self.precision(gold_standard, predictions.iloc[:,j]) 
-            #positive predictive value
-            perf_m.loc['ppv', c_param] = self.ppv(gold_standard, predictions.iloc[:,j]) 
+            #negative predictive value
+            perf_m.loc['lpv', c_param] = self.npv(gold_standard, predictions.iloc[:,j]) 
             #f1 score
             perf_m.loc['F1-score', c_param] = self.f1_score(perf_m.loc['pos-rec', c_param], perf_m.loc['precision', c_param]) 
-            perf_m.loc['neg-F1-score', c_param] = self.f1_score(perf_m.loc['neg-rec', c_param], perf_m.loc['ppv', c_param]) 
+            perf_m.loc['neg-F1-score', c_param] = self.f1_score(perf_m.loc['neg-rec', c_param], perf_m.loc['npv', c_param]) 
         return perf_m
         
     def majority_feat_sel(self, x, y, x_p, y_p, all_preds, all_scores, k, pt_out, no_classifier = 10):

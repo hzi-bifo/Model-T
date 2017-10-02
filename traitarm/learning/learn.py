@@ -135,8 +135,8 @@ class pt_classification:
                 print "balanced acc", bacc
                 precision = self.ncv.precision(y_p_t, all_preds)
                 print "precision", precision 
-                ppv = self.ncv.ppv(y_p_t, all_preds)
-                print "positive predictive value", ppv 
+                ppv = self.ncv.npv(y_p_t, all_preds)
+                print "negative predictive value", npv 
                 f1_score = self.ncv.f1_score(precision, pos_acc)
                 print "f1_score", f1_score
                 neg_f1_score = self.ncv.f1_score_neg(ppv, neg_acc)
