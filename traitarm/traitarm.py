@@ -1,6 +1,7 @@
 import sys
 import pandas as pd
 import os
+import re
 from .reconstruction import merge_annot_and_pt
 
 def execute_commands(commands):
@@ -34,6 +35,14 @@ def loop(parts, cmd_strings, args_dict, fns, out_dir, jobs, cpus, cmds):
 
 def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, cpus, anno_source, do_standardization, block_cross_validation, opt_measure):
     """Traitar-Model master method: collect the individual command strings and execute the pipeline"""
+    #parse phenotype table and make sure the phenotypes don't contain characters that can cause problems in file names
+    pt_table = pd.read_csv(phenotype_table, sep = "\t", index_col = 0)
+    #make sure index is interpreted as string and not int
+    pt_table.columns = pt_table.columns.astype('string')
+    for pt in pt_table.columns:
+        print pt
+        if bool(re.compile(r'[^A-Za-z0-9.\-_]').search(pt)):
+            sys.exit("invalid character in phenotype %s; only [a-zA-Z0-9.-_] allowed" % pt)
     cmds = []
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
@@ -95,7 +104,7 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
         cmd_strings.append(learn_pgl)
     if do_nested_cv:
         #add nested cv parameter
-        cmd_strings = [i + " --cv_inner 3" for i in cmd_strings]
+        cmd_strings = [i + " --cv_inner 10" for i in cmd_strings]
     loop(pts, cmd_strings, args_dict, fns, out_dir, range(cpus), cpus, cmds)
     model_names = ["%s_%s" % (anno_source, i) for i in modes] 
     traitar_new = "traitar new %(out_dir)s/traitar-model_%(mode)s%(block_cross_validation_switch)s_out %(feature_mapping)s %(phenotype_mapping)s %(anno_source)s %(archive_name)s"
