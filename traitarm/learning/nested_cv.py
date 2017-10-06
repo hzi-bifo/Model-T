@@ -82,8 +82,8 @@ class nested_cv:
                     w.append(1 - y[yi])
         return x.iloc[x_index,], pd.Series(y_extd), pd.Series(w)
     
-    def normalize(self, array):
-        """normalize a feature matrix"""
+    def standardize(self, array):
+        """standardize a feature matrix"""
         scaler = preprocessing.StandardScaler(with_mean = True, with_std = True).fit(array)
         transformed = pd.DataFrame(data = scaler.transform(array), index = array.index, columns = array.columns)
         return transformed, scaler
@@ -198,7 +198,7 @@ class nested_cv:
         return weights
     
     
-    def cv(self, x_train, y_train, xp_train, yp_train, x_test , C, no_classifier = 10, do_calibration = False):
+    def cv(self, x_train, y_train, xp_train, yp_train, x_test , C, no_classifier = 1, do_calibration = False):
         """train model on given training features and target and return the predicted labels for the left out samples"""
         if not self.likelihood_params is None and "continuous_target" in self.likelihood_params:
             #transform x and y
@@ -206,6 +206,10 @@ class nested_cv:
         else:
             w = pd.Series(np.ones(shape = len(y_train)) )
         #set y negative labels to -1
+                #EXPERIMENTAL BALANCE WEIGHTS
+                #sample_weight = pd.concat([balance_weights(w, y_train_t), balance_weights(pd.Series(n, sep = "\t"p.ones(len(yp_train_t))), yp_train_t)])
+                #print sample_weight.sum(), "sample weights total"
+                #END EXPERIMENTAL BALANCE WEIGHTS
         y_train.index = x_train.index
         w.index = x_train.index
         y_train_t = y_train.copy() 
@@ -232,30 +236,18 @@ class nested_cv:
             #print y_train_t_sub, yp_train_t_sub, w_sub
     
             if self.is_phypat_and_rec:
-                #reduce xp feature space to the selected features
-                #EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
-                #index_vector = (y_train_t != -1) | (w != 1)
-                #print y_train_t
-                #print w
-                #print index_vector
-                #print x_train_sub.shape
-                #index_vector.index = x_train_sub.index
-                #x_train_sub = x_train_sub[index_vector]
-                #index_vector.index = y_train_t.index
-                #y_train_t = y_train_t[index_vector]
-                #w = w[index_vector]
-                #END EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
-                xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
                 #EXPERIMENTAL BALANCE WEIGHTS
                 #sample_weight = pd.concat([balance_weights(w, y_train_t), balance_weights(pd.Series(n, sep = "\t"p.ones(len(yp_train_t))), yp_train_t)])
                 #print sample_weight.sum(), "sample weights total"
                 #END EXPERIMENTAL BALANCE WEIGHTS
+                #reduce xp feature space to the selected features
+                xp_train_sub = xp_train.loc[sample_samples_p, sample_feats]
                 X = pd.concat([x_train_sub, xp_train_sub], axis = 0)
                 if self.inverse_feats:
                     #add inverse features
                     X = pd.concat([X,1-X], axis = 1) 
                 if self.do_standardization:
-                    X, scaler = self.normalize(X)
+                    X, scaler = self.standardize(X)
                 y = pd.concat([y_train_t_sub, yp_train_t_sub], axis = 0)
                 predictor.fit(X = X, y = y)
                 if do_calibration:
@@ -268,10 +260,9 @@ class nested_cv:
                 if self.do_standardization:
                     #if reconstruction based use absolute change for prediction
                     if self.is_rec_based:
-                        x_train_sub, scaler = self.normalize(x_train_sub.abs())
-                        #x_train_sub = x_train_sub.abs()
+                        x_train_sub, scaler = self.standardize(x_train_sub.abs())
                     else:
-                        x_train_sub, scaler = self.normalize(x_train_sub.abs())
+                        x_train_sub, scaler = self.standardize(x_train_sub.abs())
                 predictor.fit(x_train_sub, y_train_t_sub)
                 #if learning from gene gains and losses, get selected feature and rebuild model based on phyletic patterns
                 if self.is_rec_based:
@@ -282,7 +273,7 @@ class nested_cv:
                     xp_train_sub_t = xp_train_sub.copy()
                     xp_train_sub_t.loc[:, ~models.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
                     if self.do_standardization:
-                        xp_train_sub_t, scaler = self.normalize(xp_train_sub_t)
+                        xp_train_sub_t, scaler = self.standardize(xp_train_sub_t)
                     predictor.fit(xp_train_sub_t, yp_train_t_sub)
                 #probability calibration
                     if do_calibration:
@@ -297,7 +288,7 @@ class nested_cv:
             if self.inverse_feats:
                 #add inverse features to test sample
                 x_test_sample = pd.concat([x_test_sample, 1 - x_test_sample], axis = 1) 
-            #normalize test sample
+            #standardize test sample
             if self.do_standardization:
                 x_test_sample = pd.DataFrame(data = scaler.transform(x_test_sample), index = x_test_sample.index, columns = x_test_sample.columns)
             all_preds.iloc[:, i]  = predictor.predict(x_test_sample)
@@ -305,7 +296,6 @@ class nested_cv:
             if do_calibration:
                 uncalibrated  = predictor.decision_function(x_test_sample)
                 all_scores.iloc[:, i]  = pd.Series(cclf.predict_proba(x_test_sample)[:, 1])
-            # uncalibrated, all_scores.iloc[:, i]
         #do majority vote to aggregate predictions
         aggr_preds = all_preds.apply(lambda x: 1 if sum(x == 1) > sum(x == -1) else -1, axis = 1).astype('int')
         return aggr_preds, all_scores 
@@ -369,6 +359,7 @@ class nested_cv:
         #N1_N4 0 
         #N2_44 1
         if not self.parsimony_params is None:
+            #This is just an implementation stump
             m = crh.reconstruct_pt_parsimony(yp_train, self.model_out, self.config, self.parsimony_params)
         else:
             m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold, self.consider_in_recon)
@@ -409,24 +400,8 @@ class nested_cv:
     
     
     def setup_folds(self, x, y, cv, x_p, y_p, pt_out, ofold = None, do_block_cross_validation = True):
-        """prepare all combinations of training and test folds, either for the standard phyletic pattern or the likelihood / parsimony reconstruction case or for the combined case"""
-        pfolds = self.setup_folds_phypat(x_p, y_p, cv, do_block_cross_validation)
-        if not self.is_rec_based:
-            #standard phyletic pattern cv
-            return pfolds
-        else:
-            folds = []
-            for i in range(len(pfolds)):
-                xp_train, yp_train, xp_test, _, _, _, _ = pfolds[i]
-                if ofold is None:
-                    x_train, y_train, x_test, y_test  = self.get_rec_samples(x, y, yp_train, pt_out, ofold = i, ifold = None)
-                else:
-                    x_train, y_train, x_test, y_test  = self.get_rec_samples(x, y, yp_train, pt_out, ofold = ofold, ifold = i)
-                folds.append((x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test))
-        return folds
-    
-    def setup_folds_phypat(self, x, y, cv, do_block_cross_validation = True):
-        """divide the samples into cv folds and return a list of training and test folds"""
+        """prepare all combinations of training and test folds, either for the standard phyletic pattern or the likelihood case or for the combined case"""
+        #divide the samples into cv folds and yield training and test fold
         folds = []
         #block cross validation
         if self.block_cross_validation is not None and do_block_cross_validation:
@@ -436,14 +411,21 @@ class nested_cv:
         else:
             kf = KFold(n_splits = cv)
             kf_split = kf.split(x)
-        #create training and test folds
+        #standard phyletic pattern cv
         for train, test in kf_split:
             x_train = x.iloc[train, :].copy()
             y_train = y.iloc[train].copy()
             x_test = x.iloc[test, :].copy()
-            folds.append((x_train, y_train, x_test, None, x_train, y_train, x_test))
-        return folds
-    
+            if not self.is_rec_based:
+                yield ((x_train, y_train, x_test, None, x_train, y_train, x_test))
+            #otherwise do max likelihood reconstruction
+            else:
+                xp_train, yp_train, xp_test = (x_train, y_train, x_test) 
+                if ofold is None:
+                    x_train, y_train, x_test, y_test = self.get_rec_samples(x, y, yp_train, pt_out, ofold = i, ifold = None)
+                else:
+                    x_train, y_train, x_test, y_test  = self.get_rec_samples(x, y, yp_train, pt_out, ofold = ofold, ifold = i)
+                yield (x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test)
     
     
     def outer_cv(self, x, y, x_p, y_p, pt_out, cv_inner = None, do_calibration = True):
@@ -452,21 +434,20 @@ class nested_cv:
         if cv_inner is given, do a nested cross validation optimizing the paramter C in the inner loop"""
         #do n fold cross validation
         if not cv_inner is None:
-            ofolds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
-            #print "outer folds set up"
+            #DEBUG print "outer folds set up"
             #list of predictions
             ocv_preds = pd.Series(np.zeros(shape=[len(y_p)]))
             ocv_preds.index = x_p.index
             ocv_scores = ocv_preds.copy()
-            for i in range(len(ofolds)):
-                x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test  = ofolds[i]
-                ifolds = self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i, do_block_cross_validation = False)
-                #print "inner folds set up"
+            i = 0
+            for x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test in self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out):
+                #DEBUG print "inner folds set up"
+                #set up prediction data frame
                 all_preds = pd.DataFrame(np.zeros(shape=[len(yp_train), len(self.config['c_params'])]))
                 all_preds.columns = self.config['c_params']
                 all_preds.index = yp_train.index
                 #do inner cross validation
-                for x_train_train, y_train_train, x_train_test, y_train_test, xp_train_train, yp_train_train, xp_train_test in ifolds:
+                for x_train_train, y_train_train, x_train_test, y_train_test, xp_train_train, yp_train_train, xp_train_test in self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i, do_block_cross_validation = False):
                     for c_param in self.config['c_params']:
                         preds, _ = self.cv(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, c_param)
                         all_preds.loc[x_train_test.index, c_param] = list(preds)
@@ -477,27 +458,24 @@ class nested_cv:
                 perf_m = self.perf_evaluation(yp_t_t, all_preds)
                 perf_m = perf_m.sort_values(by = self.opt_measure, axis = 1, ascending = False)
                 c_opt = perf_m.columns[0]
-                #print c_opt, "optimal value of the C param is this fold"
+                #DEBUG print c_opt, "optimal value of the C param is this fold"
                 #use that C param to train a classifier to predict the left out samples in the outer cv
-                p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt,  no_classifier = 10, do_calibration = do_calibration)
+                p, score = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_opt, do_calibration = do_calibration)
                 ocv_preds.loc[xp_test.index] = list(p)
                 ocv_scores.loc[xp_test.index] = list(score.iloc[:, 0])
+                i += 1
             return ocv_preds, ocv_scores
-        
-        folds = self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out)
         #store predictions for each fold in all_preds
         all_preds = pd.DataFrame(np.zeros(shape=[len(y_p), len(self.config['c_params'])]))
         all_preds.index = x_p.index
         all_preds.columns = self.config['c_params']
         all_scores = all_preds.copy()
         #do a cross validation for each value of the C param
-        for x_train, y_train, x_test, y_test, xp_train, yp_train, xp_test in folds:
+        for x_train, y_train, x_test, y_test, xp_train, yp_train, xp_test in self.setup_folds(x, y, self.cv_outer, x_p, y_p, pt_out):
             for c_param in self.config['c_params']:
                 preds, scores = self.cv(x_train, y_train, xp_train, yp_train, xp_test, c_param, do_calibration = do_calibration)
                 all_preds.loc[xp_test.index, c_param] = list(preds)
                 all_scores.loc[xp_test.index, c_param] = list(scores.iloc[:, 0]) 
-                #print all_scores.loc[xp_test.index, c_param]  
-                #print scores
         return all_preds, all_scores
         
     def perf_evaluation(self, gold_standard, predictions):
@@ -515,7 +493,7 @@ class nested_cv:
             #precision
             perf_m.loc['precision', c_param] = self.precision(gold_standard, predictions.iloc[:,j]) 
             #negative predictive value
-            perf_m.loc['lpv', c_param] = self.npv(gold_standard, predictions.iloc[:,j]) 
+            perf_m.loc['npv', c_param] = self.npv(gold_standard, predictions.iloc[:,j]) 
             #f1 score
             perf_m.loc['F1-score', c_param] = self.f1_score(perf_m.loc['pos-rec', c_param], perf_m.loc['precision', c_param]) 
             perf_m.loc['neg-F1-score', c_param] = self.f1_score(perf_m.loc['neg-rec', c_param], perf_m.loc['npv', c_param]) 
@@ -559,7 +537,7 @@ class nested_cv:
         for c_param, pos_rec, neg_rec in [(perf_m_k.columns[i], perf_m_k.loc['pos-rec'].iloc[i], perf_m_k.loc['neg-rec'].iloc[i])  for i in range(k)]:
             auc_df.loc[c_param] = self.roc_curve(y_p, all_scores.loc[:, c_param], "%s/%s_%s_roc_curve.png" %(self.model_out, pt_out, c_param), pos_rec, 1 - neg_rec)
         #add auc to performance summary
-        perf_m = pd.concat([perf_m, auc_df.T], axis = 0)
+        perf_m_k = pd.concat([perf_m_k, auc_df.T], axis = 0)
         #write them to disk
         perf_m_k.to_csv("%s/%s_perf.txt"%(self.model_out,pt_out), sep="\t", float_format = '%.3f')
         predictors = []
@@ -568,18 +546,6 @@ class nested_cv:
             no_classifier = 1
         models = pd.DataFrame(np.zeros(shape=(x.shape[1], k * no_classifier)))
         models.index = x.columns
-        #EXPERIMENTAL DISCARD NEGATIVE reconstruction labels
-        #index_vector = (y_t != -1) | (w != 1)
-        #print y_t
-        #print w
-        #print index_vector
-        #print x.shape
-        #index_vector.index = x.index
-        #x = x[index_vector]
-        #index_vector.index = y_t.index
-        #y_t = y_t[index_vector]
-        #w = w[index_vector]
-        #END EXPERIMENTAL
         bias_cparams = []
         for i in range(k):
             predictor = svm.LinearSVC(C=perf_m_k.columns[i])
@@ -601,9 +567,9 @@ class nested_cv:
                     #add inverse features if the corresponding option is set
                     if self.inverse_feats:
                         X = pd.concat([X, 1 - X], axis = 1)
-                    #normalize if the corresponding option is set
+                    #standardize if the corresponding option is set
                     if self.do_standardization:
-                        X, _ = self.normalize(X)
+                        X, _ = self.standardize(X)
                         pass
                     #Start EXPERIMENTAL this works only with the fork of scikit learn that supports sample weights
                     #predictor.fit(X, pd.concat([y_t, y_p_t], axis = 0), sample_weight = pd.concat([balance_weights(w, y_t), balance_weights(pd.Series(np.ones(shape = len(y_p))), y_p_t)]))
@@ -613,9 +579,9 @@ class nested_cv:
                     if self.inverse_feats:
                         #add inverse features
                         x_sub =  pd.concat([x_sub, x_sub], axis = 1)
-                    #normalize if , reduce = Truethe corresponding option is set
+                    #standardize if , reduce = Truethe corresponding option is set
                     if self.do_standardization:
-                        x_sub, _ = self.normalize(x_sub.abs())
+                        x_sub, _ = self.standardize(x_sub.abs())
                         #x_sub = x_sub.abs()
                         pass
                     predictor.fit(x_sub, y_t_sub)
@@ -627,7 +593,7 @@ class nested_cv:
                         xp_sub_t = xp_sub.copy()
                         xp_sub_t.loc[:, ~models_t.apply(lambda x: (x > 0).sum() >= 1 or (x < 0).sum() >= 1, axis = 1) ] = 0
                         if self.do_standardization:
-                            xp_sub_t, _ = self.normalize(xp_sub_t) 
+                            xp_sub_t, _ = self.standardize(xp_sub_t) 
                         y_p_t_sub = y_p_t.loc[sample_samples_p]
                         predictor.fit(xp_sub_t, y_p_t_sub)
                 #add inverse features if the corresponding option is set
@@ -659,7 +625,7 @@ class nested_cv:
         models_df.to_csv("%s/%s_feats.txt"%(self.model_out,pt_out), sep="\t")
         #standardize the features and write standardization parameters to disk
         if self.do_standardization:
-            _, scaler = self.normalize(x_p)
+            _, scaler = self.standardize(x_p)
             scale_df = pd.DataFrame(scaler.scale_, index = x_p.columns, columns = ["scale"]).to_csv("%s/%s_scale.txt" % (self.model_out, pt_out), sep = "\t")
             scale_df = pd.DataFrame(scaler.mean_, index = x_p.columns, columns = ["mean"]).to_csv("%s/%s_mean.txt" % (self.model_out, pt_out), sep = "\t")
         #get baseline classification models for each individual feature

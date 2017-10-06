@@ -130,16 +130,16 @@ class pt_classification:
                 #accuracy -1 class
                 neg_acc = self.ncv.recall_neg(y_p_t, all_preds)
                 print "neg_acc", neg_acc
-                #balanced accuracy
+                #balanced / macro accuracy
                 bacc = self.ncv.bacc(pos_acc, neg_acc)
                 print "balanced acc", bacc
                 precision = self.ncv.precision(y_p_t, all_preds)
                 print "precision", precision 
-                ppv = self.ncv.npv(y_p_t, all_preds)
+                npv = self.ncv.npv(y_p_t, all_preds)
                 print "negative predictive value", npv 
                 f1_score = self.ncv.f1_score(precision, pos_acc)
                 print "f1_score", f1_score
-                neg_f1_score = self.ncv.f1_score_neg(ppv, neg_acc)
+                neg_f1_score = self.ncv.f1_score_neg(npv, neg_acc)
                 print "negative f1_score", neg_f1_score
                 miscl = y_p_t.index[(all_preds != y_p_t)]
                 #bind actual labels and predictions
@@ -148,9 +148,12 @@ class pt_classification:
                 auc = self.ncv.roc_curve(y_p, all_scores, "%s/%s_roc_curve.png" % (self.model_out, pt_out), pos_acc, 1 - neg_acc)
                 #cv accuracy stats
                 cv_out = "%s/cv_acc.txt"%self.model_out
+                cv_out_exists = False 
+                if os.path.exists(cv_out):
+                    cv_out_exists = True
                 with open(cv_out, "a") as f:
-                    if not os.path.exists(cv_out):
-                        f.write('\tpos_recall\tneg_recall\tbalanced_accuracy\tprecision\tppv\tf1-score\tneg-f1-score\tauc\n')
+                    if not cv_out_exists:
+                        f.write('\tpos_recall\tneg_recall\tbalanced_accuracy\tprecision\tnpv\tf1-score\tneg-f1-score\tauc\n')
                 with open(cv_out, "a") as f:
                     f.write('%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n' % (pt_out, pos_acc, neg_acc, bacc, precision, f1_score, auc))
                     f.flush()

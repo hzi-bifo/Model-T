@@ -40,7 +40,6 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
     #make sure index is interpreted as string and not int
     pt_table.columns = pt_table.columns.astype('string')
     for pt in pt_table.columns:
-        print pt
         if bool(re.compile(r'[^A-Za-z0-9.\-_]').search(pt)):
             sys.exit("invalid character in phenotype %s; only [a-zA-Z0-9.-_] allowed" % pt)
     cmds = []
