@@ -104,7 +104,7 @@ if __name__ == "__main__":
     ts.title.add_face(CircleFace( radius = 8, color = map_bacc2color(1.0, 0.75,  0.99)), column=6)
     ts.title.add_face(TextFace("100%"), column = 6)
 
-    t.render(args.out_f, tree_style = ts, dpi = 300)    
+    t.render(args.out_f, tree_style = ts, dpi = 1200)    
 
 
 

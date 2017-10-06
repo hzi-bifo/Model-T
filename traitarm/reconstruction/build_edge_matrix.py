@@ -257,9 +257,9 @@ class build_edge_matrix:
         """for all phenotypes generate a edge based matrix"""
         for pt in pts:
             #check if phenotype has any events associated with it
-            if pt not in self.char2ev:
-                print "phenotype", pt, "has no events associated with it. Skipping.."
-                continue
+            #if pt not in self.char2ev:
+            #    print "phenotype", pt, "has no events associated with it. Skipping.."
+            #    continue
             edges = self.get_edges(pt)
             pt_dict = self.get_pt_dict(edges)
             #plus one because we want to include column gt_end

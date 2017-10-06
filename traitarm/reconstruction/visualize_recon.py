@@ -1,6 +1,6 @@
 import pandas as pd
 import ete2
-from ete2 import Tree, faces, AttrFace, TreeStyle
+from ete2 import faces, Tree, AttrFace, TreeStyle
 import pylab
 from matplotlib.colors import hex2color, rgb2hex, hsv_to_rgb, rgb_to_hsv
 
@@ -51,7 +51,7 @@ def get_style():
     # Do not add leaf names automatically
     ts.show_leaf_name = False
     ts.show_scale = True 
-    ts.force_topology = True
+    ts.force_topology = False 
     # Use my custom layout
     ts.layout_fn = my_layout
     return ts
@@ -60,9 +60,8 @@ def plot_tree(pt_tree, target_node, out):
     #pt_tree, feats, pf2color = get_tree(phenotype = phenotype, feat_list = "top_cor", is_ml_plus_phypat = True, target_node = target_node)
     pt_tree.dist = 0
     target = pt_tree.search_nodes(name = target_node)[0]
-    target.render("%%inline",  tree_style = get_style())
-    target.render(out + '_tree.svg',  tree_style = get_style())
-    target.render(out + '_tree.png', tree_style = get_style())
+    target.render(out + '_tree.pdf',  tree_style = get_style())
+    #target.render(out + '_tree.png', tree_style = get_style())
     return target, feats, pf2color
 
 def plot_legend(feats, out, pf2color,  pf_desc = False, pf_acc = True, include_class = False):
@@ -87,17 +86,20 @@ def plot_legend(feats, out, pf2color,  pf_desc = False, pf_acc = True, include_c
     figlegend.savefig(out + "_legend.png")
     return figlegend
 
-def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, feat_list, sample_mapping, threshold = 0.5, target_node = None, are_continuous_features_with_discrete_phenotype = False, max_feats = 10, miscl = None):
+def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, feat_list, sample_mapping, threshold = 0.5, target_node = None, are_continuous_features_with_discrete_phenotype = False, max_feats = 10, miscl = None, node_annotation = None):
     #read target feats
     feats = pd.read_csv(feat_list, index_col = 0, sep = "\t")
     pt_tree = ete2.Tree(tree, format = 1)
+    pt_tree.ladderize()
+    if not node_annotation is None:
+        node_table = pd.read_csv(node_annotation, sep = "\t", index_col = 0)
     sample_mapping = pd.read_csv(sample_mapping, index_col = 0, sep = "\t")
     #read node and edge reconstruction matrices
     node_recon = pd.read_csv(node_recon, sep = "\t", index_col = 0)
     gain_recon = pd.read_csv(gain_recon, sep = "\t", index_col = 0)
-    gain_recon.index = ["_".join((i.split("_")[0], i.split("_")[len(i.split("_")) - 1])) for i in gain_recon.index.values]
+    gain_recon.index = ["_".join(("_".join(i.split("_")[:-1]), i.split("_")[-1])) for i in gain_recon.index.values]
     loss_recon = pd.read_csv(loss_recon, sep = "\t", index_col = 0)
-    loss_recon.index = ["_".join((i.split("_")[0], i.split("_")[len(i.split("_")) - 1])) for i in loss_recon.index.values]
+    loss_recon.index = ["_".join(("_".join(i.split("_")[:-1]), i.split("_")[-1])) for i in loss_recon.index.values]
     #prune to target node
     if target_node is not None:
         pt_tree = pt_tree.search_nodes(name = target_node)[0]
@@ -116,6 +118,21 @@ def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, 
         #ignore the root
         if n.name == "N1":
             continue
+        if not node_annotation is None:
+            if n.name in node_table.index:
+                for attr,i  in zip(node_table.columns, range(len(node_table.columns))):
+                    value = node_table.loc[n.name, attr]
+                    if not pd.isnull(value):
+                        if value == 0:
+                            rf = ete2.CircleFace(radius = 8, style = "circle", color = 'red')
+                        elif value == 2:
+                            rf = faces.CircleFace(radius = 8, style = "circle", color = 'orange')
+                        else:
+                            rf = faces.CircleFace(radius = 8, style = "circle", color = 'green')
+                    else:
+                        rf = faces.CircleFace(radius = 8, style = "circle", color = 'grey')
+                    n.add_face(rf, column = i, position = "aligned")
+
         ns = node_recon.loc[n.name, phenotype] 
         style = ete2.NodeStyle()
         style["shape"] = 'square'
@@ -123,12 +140,11 @@ def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, 
         if pd.isnull(ns):
             style['fgcolor'] = 'grey'
         elif ns < threshold:
-            style['fgcolor'] = 'green'
-        else:
             style['fgcolor'] = 'darkred'
+        else:
+            style['fgcolor'] = 'green'
         if not n.name == "N1":
             branch_id = n.name + "_" + n.up.name
-            #print gain_recon.loc[branch_id, phenotype], loss_recon.loc[branch_id, phenotype]
             if gain_recon.loc[branch_id, phenotype] > threshold:
                 style["hz_line_type"] = 1
                 style["hz_line_color"] = 'green' 
@@ -142,9 +158,10 @@ def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, 
                 style["hz_line_color"] = 'black'
             n.set_style(style)
             #check if sample was misclassified and add misclassified label
-            if node2name[n.name] in miscl_m.index:
-                tf = faces.TextFace("misclassified")
-                n.add_face(tf, column = 0, position = "branch-right")
+            if not miscl is None:
+                if node2name[n.name] in miscl_m.index:
+                    tf = faces.TextFace("misclassified")
+                    n.add_face(tf, column = 0, position = "branch-right")
             #set species name instead of tax id
             if n.name in sample_mapping.index:
                 node2name[n.name] = sample_mapping.loc[n.name,][0]
@@ -190,11 +207,12 @@ def get_tree(phenotype, tree, gain_recon, loss_recon, node_recon, pfam_mapping, 
     #filtered_ids = pt_gt2id.loc[filtered_pfams, 0] - 1
     #print filtered_ids
     #top10_feats_with_event = top10_feats.loc[filtered_ids,]
+    #process node annotation
     return pt_tree, top10_feats, pfam2color
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser("""build node to feat matrix from gainLoss input""")
+    parser = argparse.ArgumentParser("""visualize target list of features""")
     parser.add_argument("node_recon", help = "node ancestral character state reconstruction") 
     parser.add_argument("gain_recon", help = "gain events ancestral character state reconstruction") 
     parser.add_argument("loss_recon", help = "loss events ancestral character state reconstruction") 
@@ -209,7 +227,8 @@ if __name__ == "__main__":
     parser.add_argument("out",  help = "output file")
     parser.add_argument("--max_feats", type = int, default = 10, help = "visualize at most max_feats features")
     parser.add_argument("--miscl", help = "table of misclassified samples")
+    parser.add_argument("--node_annotation", help = "table of binary features for labeling the nodes")
     a = parser.parse_args()
-    pt_tree, feats, pf2color = get_tree(node_recon = a.node_recon, gain_recon = a.gain_recon, loss_recon = a.loss_recon, pfam_mapping = a.pfam_mapping, tree = a.tree, feat_list = a.feat_list, phenotype = a.phenotype, target_node = a.target_node, threshold = a.threshold, sample_mapping = a.sample_mapping, are_continuous_features_with_discrete_phenotype = a.are_continuous_features_with_discrete_phenotype, max_feats = a.max_feats, miscl = a.miscl)
+    pt_tree, feats, pf2color = get_tree(node_recon = a.node_recon, gain_recon = a.gain_recon, loss_recon = a.loss_recon, pfam_mapping = a.pfam_mapping, tree = a.tree, feat_list = a.feat_list, phenotype = a.phenotype, target_node = a.target_node, threshold = a.threshold, sample_mapping = a.sample_mapping, are_continuous_features_with_discrete_phenotype = a.are_continuous_features_with_discrete_phenotype, max_feats = a.max_feats, miscl = a.miscl, node_annotation = a.node_annotation)
     plot_tree(pt_tree, a.target_node, a.out)
     plot_legend(feats, a.out, pf2color) 

@@ -47,7 +47,7 @@ def collect_miscl(miscl_dir, sample_ids_f, pt_mapping_f, evaluation_f, out_dir, 
                     #miscl_per_pt_FP.loc[j, "gold standard"] = 0.0
                     miscl_per_pt_FP.loc[j, i] = 1
                     miscl_m.loc[j, "false_positives"] += 1
-    miscl_m.loc[:, ["positve_samples", "negative_samples"]] = pt_m.loc[miscl_m.index, ].apply(lambda x: pd.Series([(x.astype("string") == "1").sum(), (x.astype("string") == "0").sum()], index = ["positve_samples", "negative_samples"]), axis = 1) 
+    miscl_m.loc[:, ["positve_samples", "negative_samples"]] = pt_m.loc[miscl_m.index, ].apply(lambda x: pd.Series([(x.astype("string") == "+").sum(), (x.astype("string") == "-").sum()], index = ["positve_samples", "negative_samples"]), axis = 1) 
     miscl_m.to_csv("%s/misclassified_overall.tsv"%out_dir, sep = "\t",)
     miscl_per_pt_FP.to_csv("%s/misclassified_per-pt_FP.tsv"%out_dir, sep = "\t",)
     miscl_per_pt_FN.to_csv("%s/misclassified_per-pt_FN.tsv"%out_dir, sep = "\t",)

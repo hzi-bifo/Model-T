@@ -11,7 +11,8 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
 
     def __init__(self,tree_f, format, phy, event_f, pf_ids, pt_ids = [], use_gain_events=True, use_likelihood=True):
         #t = dp.Tree()
-        t = dp.Tree.get(path = tree_f, schema = 'newick', suppress_internal_node_taxa=False)
+        #preserve underscores: make sure dendropy doesn't convert things like isol_56b to isol 56b to avoid downstream problems
+        t = dp.Tree.get(path = tree_f, schema = 'newick', suppress_internal_node_taxa=False, preserve_underscores = True)
         self.pf_ids = pf_ids
         self.pt_ids = pt_ids
         self.tree = t
@@ -91,25 +92,26 @@ class build_edge_matrix_likelihood(bem.build_edge_matrix):
                     else:
                         edge2char2val[isn][gt] = float(ev[4]) 
         #account for phenotype edges but only if this is an actual phenotype (no missing values involved)
-        for ev in char2ev[pt]:
-            if ev[0] in node2edge:
-                edge1 = node2edge[ev[0]]
-            else: continue
-            if ev[1] in node2edge:
-                edge2 = node2edge[ev[1]]
-            else: continue
-            isn = edge1.intersection(edge2).pop()
-            if isn in edge2char2val and pt not in edge2char2val[isn]:
-                if self.use_likelihood:
-                    edge2char2val[isn][pt] = float(ev[3])
-                else:
-                    edge2char2val[isn][pt] = float(ev[4])
+        if pt in char2ev:
+            for ev in char2ev[pt]:
+                if ev[0] in node2edge:
+                    edge1 = node2edge[ev[0]]
+                else: continue
+                if ev[1] in node2edge:
+                    edge2 = node2edge[ev[1]]
+                else: continue
+                isn = edge1.intersection(edge2).pop()
+                if isn in edge2char2val and pt not in edge2char2val[isn]:
+                    if self.use_likelihood:
+                        edge2char2val[isn][pt] = float(ev[3])
+                    else:
+                        edge2char2val[isn][pt] = float(ev[4])
 
-            elif isn in edge2char2val and pt  in edge2char2val[isn]:
-                if self.use_likelihood:
-                    edge2char2val[isn][pt] += float(ev[3]) * (1-edge2char2val[isn][pt])
-                else:
-                    edge2char2val[isn][pt] += float(ev[4])
+                elif isn in edge2char2val and pt  in edge2char2val[isn]:
+                    if self.use_likelihood:
+                        edge2char2val[isn][pt] += float(ev[3]) * (1-edge2char2val[isn][pt])
+                    else:
+                        edge2char2val[isn][pt] += float(ev[4])
 
 
         return edge2char2val

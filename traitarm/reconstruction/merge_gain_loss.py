@@ -9,7 +9,6 @@ def reduce(in_dir, out_dir, parts, feats, phenotypes):
         m_compl = None 
         for i in range(parts):
             fn = "%s_%s/pt%s.dat" %(in_dir, i, pt)       
-            print fn
             if not os.path.exists(fn):
                 break
             m = pd.read_csv(fn, sep = "\t", index_col = 0)

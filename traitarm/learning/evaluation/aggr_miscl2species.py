@@ -29,7 +29,7 @@ def collect_miscl(miscl_dir, pf_pt_matrix_f, pt_id2acc, out_dir, sample_ids_f, a
             miscl_per_pt_POS.loc[pos, i] = 1
             miscl_per_pt_NEG.loc[neg, i] = 1
             try:
-                miscl = ps.read_csv("%s/%s_miscl.txt"%(miscl_dir, i), sep = "\t", header = None, index_col = 0)
+                miscl = ps.read_csv("%s/%s_miscl.txt"%(miscl_dir, i), sep = "\t", index_col = 0)
             except ValueError:
                 print "phenotype", i, "has no misclassified samples"
                 continue
@@ -42,16 +42,19 @@ def collect_miscl(miscl_dir, pf_pt_matrix_f, pt_id2acc, out_dir, sample_ids_f, a
                 if allow_missing_samples:
                     pass
                 else:
+                    print j
+                    print miscl.index
                     raise KeyError
             else:
-                if miscl.loc[j, 1] == 1.0:
-                    miscl_per_pt_FN.loc[j, i] = 1
-                    #miscl_per_pt_NEG.loc[j, i] = 1
-                    miscl_m.loc[j, "false_negatives"] += 1 
-                else: 
+                #mark as false positive if prediction is positive ("1") and therefore the ground truth is negative
+                if miscl.loc[j, "1"] == 1.0:
                     miscl_per_pt_FP.loc[j, i] = 1
+                    #miscl_per_pt_NEG.loc[j, i] = 1
+                    miscl_m.loc[j, "false_positives"] += 1 
+                else: 
+                    miscl_per_pt_FN.loc[j, i] = 1
                     #miscl_per_pt_POS.loc[j, i] = 1
-                    miscl_m.loc[j, "false_positives"] += 1
+                    miscl_m.loc[j, "false_negatives"] += 1
     #correct index when using gideon indexed phenotype matrix
     #miscl_m.loc[:, ["positve_samples", "negative_samples"]] = pt_m.loc[miscl_m.index, (pt_id2acc.index.values.astype(int) + 1).astype('str')].apply(lambda x: ps.Series([(x.astype("string") == "1").sum(), (x.astype("string") == "0").sum()], index = ["positve_samples", "negative_samples"]), axis = 1) 
     miscl_m.loc[:, ["positve_samples", "negative_samples"]] = pt_m.loc[miscl_m.index, pt_id2acc.index].apply(lambda x: ps.Series([(x.astype("string") == "1").sum(), (x.astype("string") == "0").sum()], index = ["positve_samples", "negative_samples"]), axis = 1) 
