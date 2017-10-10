@@ -57,6 +57,26 @@ Construct a plant biomass degradation genotype-phenotype model based on the exam
     cd ..
     traitarm pbd_out example/pbd.txt example/traitar_out/annotation/dbcan/summary.dat  --feature_mapping  example/dbcan2desc_name_full.txt  10   --do_phypat_only --cpus 10
     ``` 
+## Using an HMM database other than Pfam
+
+1. Download HMM database
+
+```
+wget http://csbl.bmb.uga.edu/dbCAN/download/dbCAN-fam-HMMs.txt.v4
+```
+
+2. Link dbCAN families with descriptions creating an empty phenotype model archive file using Traitar
+
+```
+traitar new  dbcan2desc_name_full.txt dbcan dbcan_v4
+```
+
+3. Annotate with Traitar using the new phenotype model archive using 10 CPUs
+
+``` 
+traitar annotate --primary_hmm_db dbCAN-fam-HMMs.txt.v4 -p dbcan_v4.tar.gz faa/ sample_table.txt from_genes traitar_dbcan_v4_out/ --cpus 10 
+``` 
+
 # Output
 cv_acc.txt gives information about the overall performance of the models for each phenotype including the 
 TPR = true positive rate, TNR = true negative rate, BACC = balanced accuracy, precision, F1-Score and AUC = Area under the curve
