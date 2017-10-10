@@ -77,6 +77,12 @@ traitar new  dbcan2desc_name_full.txt dbcan dbcan_v4
 traitar annotate --primary_hmm_db dbCAN-fam-HMMs.txt.v4 -p dbcan_v4.tar.gz faa/ sample_table.txt from_genes traitar_dbcan_v4_out/ --cpus 10 
 ``` 
 
+4. Train a model for Traitar using Model-T
+
+```
+traitarm pbd_dbcan_out  pbd.txt traitar_dbcan_v4_out/annotation/dbcan/summary.dat  --feature_mapping dbcan2desc_name_full.txt  10  --cpus 10
+```
+
 # Output
 cv_acc.txt gives information about the overall performance of the models for each phenotype including the 
 TPR = true positive rate, TNR = true negative rate, BACC = balanced accuracy, precision, F1-Score and AUC = Area under the curve
