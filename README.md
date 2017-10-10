@@ -3,9 +3,13 @@ Learning phenotype classification models from protein family phyletic patterns a
 # Installation
 Model-T is available via anaconda / bioconda: Install by 
 
-```conda install model-t``` 
+```
+conda create -n model-t
+source activate model-t
+conda install model-t
+``` 
 
-Be sure to add the bioconda channel as described on the bioconda website:
+Be sure to add the bioconda channel as described on the bioconda website before installing Model-T:
 
 ```
 conda config --add channels defaults
@@ -31,10 +35,16 @@ The tree should be provided in Newick format and should have been computed based
 
 ## Re-using phenotype models
 For each type of phenotype models trained (observed, evo, observed+evo) there will be a re-usable model available that can be used to predict new samples using Traitar (also see https://github.com/aweimann/traitar). Traitar by default only supports annotation using hmmsearch. 
-```traitar phenotype <input_dir> <sample_table> <from_nucleotides/from_genes> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>```
+
+```
+traitar phenotype <input_dir> <sample_table> <from_nucleotides/from_genes> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>
+```
 
 If you're using some other kind of annotation for instance SNPs, gene expression data or gene family presence and absence information generated with Roary, you have to ensure that the annotation is generated the same way as the training data was generated e.g. using the same SNP calling pipeline or in case of Roary generating your own set of HMMs and annotating the new genomes. In this case you need to use Traitar with the from_annotation and the -a option to provide a pre-computed annotation table.
-```traitar phenotype <input_dir> <sample_table> from_annotation -a <path_to_annotation> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>```
+
+```
+traitar phenotype <input_dir> <sample_table> from_annotation -a <path_to_annotation> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>
+```
 
 ## Example usage
 Construct a plant biomass degradation genotype-phenotype model based on the example data
