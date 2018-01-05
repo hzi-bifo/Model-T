@@ -12,7 +12,7 @@ def execute_commands(commands):
         #nothing to do
         return
     #run in sequential order
-    for i in commands:
+    for i in commands: 
         p = Popen(i,   shell = True,  executable = "/bin/bash", stdin = PIPE)
         p.communicate(input = i)
         if p.returncode != 0:
@@ -33,7 +33,7 @@ def loop(parts, cmd_strings, args_dict, fns, out_dir, jobs, cpus, cmds):
     for fn in fns:
         cmds.append("cat %s/%s | parallel -j %s\n" % (out_dir, fn, cpus))
 
-def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, cpus, anno_source, do_standardization, block_cross_validation, opt_measure):
+def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, feature_mapping, phenotype_mapping, sample_mapping, do_nested_cv, cpus, anno_source, do_standardization, block_cross_validation, opt_measure, out_model, config):
     """Traitar-Model master method: collect the individual command strings and execute the pipeline"""
     #parse phenotype table and make sure the phenotypes don't contain characters that can cause problems in file names
     pt_table = pd.read_csv(phenotype_table, sep = "\t", index_col = 0)
@@ -47,7 +47,7 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
         os.mkdir(out_dir)
     #merge annotation/features and phenotype data
     pts = merge_annot_and_pt.merge_data(annotation_tables, phenotype_table, out_dir).index.tolist()
-    args_dict = {"out_dir" : out_dir, "features" : "feats.txt", "phenotypes" : "phenotypes.txt" , "parts": cpus, "phenotype_table" : phenotype_table, "anno_source": anno_source} 
+    args_dict = {"out_dir" : out_dir, "features" : "feats.txt", "phenotypes" : "phenotypes.txt" , "parts": cpus, "phenotype_table" : phenotype_table, "anno_source": anno_source, "config" : config} 
     pts = pd.read_csv("%s/phenotypes.txt" % out_dir, index_col = 0).index.tolist()
     if tree is not None:
         args_dict["tree_unpruned"] = tree 
@@ -69,7 +69,8 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
         for fn, cmd in zip(fns, [merge_str1, merge_str2, discr_str]):
             loop(pts, [cmd], args_dict, [fn], out_dir, range(cpus), cpus, cmds)    
     fns = ["learn.sh"]
-    args_dict["config"] = os.path.join(os.path.dirname(__file__), "config.json")
+    if config is None:
+        args_dict["config"] = os.path.join(os.path.dirname(__file__), "config.json")
     var_names= ["feature_mapping", "phenotype_mapping", "sample_mapping"]
     mappings = [feature_mapping, phenotype_mapping, sample_mapping]
     df_names = ["annot2desc.txt", "pt2desc.txt", "ids2name.txt"]
@@ -90,26 +91,26 @@ def reconstruction_cmds(out_dir, tree, annotation_tables, phenotype_table, featu
     else:
         args_dict['block_cross_validation'] = ''
         args_dict['block_cross_validation_switch'] = ''
-    learn_phypat = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --with_seed --resume %(do_standardization)s %(block_cross_validation)s --opt_measure %(opt_measure)s"
+    learn_phypat = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --with_seed --resume %(do_standardization)s %(block_cross_validation)s --opt_measure %(opt_measure)s "
     cmd_strings = [learn_phypat] 
     #prediction mode
     modes = ["observed"]
     if not tree is None: 
         modes = modes + ["observed+evo", "evo"]
         fns = fns + ["learn_observed+evo.sh", "learn_evo.sh"]
-        learn_phypat_pgl = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed+evo%(block_cross_validation_switch)s_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --is_phypat_and_rec --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s --opt_measure %(opt_measure)s"
-        learn_pgl =  "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_evo_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s  --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s --opt_measure %(opt_measure)s" 
+        learn_phypat_pgl = "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_observed+evo%(block_cross_validation_switch)s_out/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s --is_phypat_and_rec --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss,gt_probs:True --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s --opt_measure %(opt_measure)s"
+        learn_pgl =  "learn %(out_dir)s/annot_pheno.dat 10 %(out_dir)s/traitar-model_evo_%(block_cross_validation_switch)sout/ %(feature_mapping)s <(echo $'\\taccession\\n%(part)s\\tbla') %(config)s %(sample_mapping)s  --rec_dir %(out_dir)s/pgl_matrix_gain_loss/ --likelihood_params threshold:0.5,mode:gain_loss,gt_probs:True --consider_in_recon  %(out_dir)s/mapped_ids.txt --tree_named %(out_dir)s/tree_named.tre --tree %(out_dir)s/tree.tre --with_seed --resume %(block_cross_validation)s --opt_measure %(opt_measure)s" 
         cmd_strings.append(learn_phypat_pgl)
         cmd_strings.append(learn_pgl)
     if do_nested_cv:
         #add nested cv parameter
         cmd_strings = [i + " --cv_inner 10" for i in cmd_strings]
     loop(pts, cmd_strings, args_dict, fns, out_dir, range(cpus), cpus, cmds)
-    model_names = ["%s_%s" % (anno_source, i) for i in modes] 
-    traitar_new = "traitar new %(out_dir)s/traitar-model_%(mode)s%(block_cross_validation_switch)s_out %(feature_mapping)s %(phenotype_mapping)s %(anno_source)s %(archive_name)s"
+    model_names = ["%s_%s" % (out_model, i) for i in modes] 
+    traitar_new = "traitar new --models_dir %(out_dir)s/traitar-model_%(mode)s%(block_cross_validation_switch)s_out %(feature_mapping)s --pt2desc %(phenotype_mapping)s %(anno_source)s %(archive_name)s"
     for mode, name in zip(modes, model_names):
         args_dict["mode"] = mode
-        args_dict["archive_name"] = os.path.join(out_dir, name)
+        args_dict["archive_name"] = os.path.join(name)
         args_dict["anno_source"] = anno_source 
         cmds.append((traitar_new % args_dict) + "\n")
     execute_commands(cmds)
