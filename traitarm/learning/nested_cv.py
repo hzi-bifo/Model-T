@@ -328,6 +328,7 @@ class nested_cv:
                 #if features have been discretized before just sum over the values of the branches
                 if not 'gt_probs' in self.likelihood_params:
                     cs = x_r.loc[train2all[e], :].sum(axis=0)
+                    cs[cs > 0] = 1
                     df = pd.concat([df, cs], axis = 1)
                 #in case of continuous features sum over the branches (the feature value of a branch represents the difference of the reconstructed value of the feature for the start and the end node of that branch)
                 elif self.is_phenotype_and_continuous_features:
@@ -346,8 +347,8 @@ class nested_cv:
             else: 
                 raise Exception("parsimony case not yet implemented")    
         #make sure there are no entries in the summed up likelihood matrix other than 0 and 1
-        if not self.likelihood_params is None and 'gt_probs' in self.likelihood_params:
-            df[x_r > 0] = 1
+        #assert (df[x_r < 0].any()) 
+        #assert (df[x_r > 1].any())
         #get df back into samples x features shape 
         df.columns = train2all.keys()
         return df.T
@@ -358,11 +359,7 @@ class nested_cv:
         #retrieve matrix like:
         #N1_N4 0 
         #N2_44 1
-        if not self.parsimony_params is None:
-            #This is just an implementation stump
-            m = crh.reconstruct_pt_parsimony(yp_train, self.model_out, self.config, self.parsimony_params)
-        else:
-            m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold, self.consider_in_recon)
+        m = crh.reconstruct_pt_likelihood(yp_train, self.model_out, self.config, self.likelihood_params, pt_out, ofold, ifold, self.consider_in_recon)
         all_pt_edges = set(x_r.index)
         train_pt_edges = set(m.index)
         #print len(all_pt_edges), "anzahl aller reconstruction samples"
@@ -385,46 +382,41 @@ class nested_cv:
         joint_y_r = m.loc[train2all, :].iloc[:, 0] 
         #add all the other training samples
         training_edges = all_pt_edges.intersection(train_pt_edges)
-        #print x_r.loc[training_edges,:].shape
-        #print joint_x_r.shape, joint_x_r.index
         x_r_train = pd.concat([x_r.loc[training_edges,:], joint_x_r], axis = 0)
-        #print "x_r_train shape", x_r_train.shape
-        #print "x_r_train index", x_r_train.index
         y_r_train = pd.concat([m.loc[training_edges, :].iloc[:,0], joint_y_r], axis = 0)
         y_r_train[y_r_train == 2] = 1
-        #print "y_r_train shape", y_r_train.shape
-        #replace negative labels with -1
         x_r_test = x_r.loc[test_edges,]
         y_r_test = y_r.loc[test_edges,]
         return x_r_train, y_r_train, x_r_test, y_r_test
     
     
-    def setup_folds(self, x, y, cv, x_p, y_p, pt_out, ofold = None, do_block_cross_validation = True):
+    def setup_folds(self, x, y, cv, x_p, y_p, pt_out, ifold = None, ofold = None, do_block_cross_validation = True):
         """prepare all combinations of training and test folds, either for the standard phyletic pattern or the likelihood case or for the combined case"""
         #divide the samples into cv folds and yield training and test fold
         folds = []
         #block cross validation
         if self.block_cross_validation is not None and do_block_cross_validation:
             kf = GroupKFold(n_splits = cv)
-            kf_split = kf.split(x, groups = self.block_cross_validation.loc[x.index, "group_id"].tolist())
+            kf_split = kf.split(x_p, groups = self.block_cross_validation.loc[x.index, "group_id"].tolist())
         #normal k fold cross-validation
         else:
             kf = KFold(n_splits = cv)
-            kf_split = kf.split(x)
-        #standard phyletic pattern cv
+            kf_split = kf.split(x_p)
+        ifold = 0
         for train, test in kf_split:
-            x_train = x.iloc[train, :].copy()
-            y_train = y.iloc[train].copy()
-            x_test = x.iloc[test, :].copy()
+            xp_train = x_p.iloc[train, :].copy()
+            yp_train = y_p.iloc[train].copy()
+            xp_test = x_p.iloc[test, :].copy()
             if not self.is_rec_based:
-                yield ((x_train, y_train, x_test, None, x_train, y_train, x_test))
+                #standard phyletic pattern cv
+                yield ((xp_train, yp_train, xp_test, None, xp_train, yp_train, xp_test))
             #otherwise do max likelihood reconstruction
             else:
-                xp_train, yp_train, xp_test = (x_train, y_train, x_test) 
                 if ofold is None:
-                    x_train, y_train, x_test, y_test = self.get_rec_samples(x, y, yp_train, pt_out, ofold = i, ifold = None)
+                    x_train, y_train, x_test, y_test = self.get_rec_samples(x, y, yp_train, pt_out, ofold = ifold, ifold = None)
                 else:
-                    x_train, y_train, x_test, y_test  = self.get_rec_samples(x, y, yp_train, pt_out, ofold = ofold, ifold = i)
+                    x_train, y_train, x_test, y_test  = self.get_rec_samples(x, y, yp_train, pt_out, ofold = ofold, ifold = ifold)
+                ifold += 1
                 yield (x_train, y_train, x_test, y_test,  xp_train, yp_train, xp_test)
     
     
@@ -447,10 +439,10 @@ class nested_cv:
                 all_preds.columns = self.config['c_params']
                 all_preds.index = yp_train.index
                 #do inner cross validation
-                for x_train_train, y_train_train, x_train_test, y_train_test, xp_train_train, yp_train_train, xp_train_test in self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i, do_block_cross_validation = False):
+                for x_train_train, y_train_train, x_train_test, y_train_test, xp_train_train, yp_train_train, xp_train_test in self.setup_folds(x_train, y_train, cv_inner, xp_train, yp_train, pt_out, i, do_block_cross_validation = False, ofold = i):
                     for c_param in self.config['c_params']:
                         preds, _ = self.cv(x_train_train, y_train_train, xp_train_train, yp_train_train, xp_train_test, c_param)
-                        all_preds.loc[x_train_test.index, c_param] = list(preds)
+                        all_preds.loc[xp_train_test.index, c_param] = list(preds)
                 #determine C param with the best accuracy
                 #copy yp train and change the negative labels from 0 to -1
                 yp_t_t = yp_train.copy()
@@ -499,7 +491,7 @@ class nested_cv:
             perf_m.loc['neg-F1-score', c_param] = self.f1_score(perf_m.loc['neg-rec', c_param], perf_m.loc['npv', c_param]) 
         return perf_m
         
-    def majority_feat_sel(self, x, y, x_p, y_p, all_preds, all_scores, k, pt_out, no_classifier = 10):
+    def majority_feat_sel(self, x, y, x_p, y_p, all_preds, all_scores, k, pt_out, no_classifier = 1):
         """determine the features occuring in the majority of the k best models"""
         #sanity check if number of classifiers selected for majority feature selection exceeds the number of c params
         if k > len(self.config['c_params']):
@@ -626,8 +618,12 @@ class nested_cv:
         #standardize the features and write standardization parameters to disk
         if self.do_standardization:
             _, scaler = self.standardize(x_p)
-            scale_df = pd.DataFrame(scaler.scale_, index = x_p.columns, columns = ["scale"]).to_csv("%s/%s_scale.txt" % (self.model_out, pt_out), sep = "\t")
-            scale_df = pd.DataFrame(scaler.mean_, index = x_p.columns, columns = ["mean"]).to_csv("%s/%s_mean.txt" % (self.model_out, pt_out), sep = "\t")
+            scale_df = pd.DataFrame(scaler.scale_, index = x_p.columns)
+            scale_df.columns = ["scale"]
+            scale_df.to_csv("%s/%s_scale.txt" % (self.model_out, pt_out), sep = "\t")
+            mean_df = pd.DataFrame(scaler.mean_, index = x_p.columns)
+            mean_df.columns = ["mean"]
+            mean_df.to_csv("%s/%s_mean.txt" % (self.model_out, pt_out), sep = "\t") 
         #get baseline classification models for each individual feature
         if not len(feats) == 0:
             #initiate, fit and predict with decision stump for each feature
