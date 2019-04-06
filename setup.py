@@ -16,7 +16,7 @@ else:
 
 setup(name='traitarm',
         version = verstr,
-        description='TraitarM - predictive genotype-phenotype models',
+        description='Model-T - predictive genotype-phenotype models',
         url = 'http://github.com/aweimann/traitar-model',
         author='Aaron Weimann',
         author_email='weimann@hhu.de',
@@ -25,4 +25,4 @@ setup(name='traitarm',
         include_package_data = True,
         scripts = ['bin/build_edge_matrix_likelihood', 'bin/discretize_likelihood_recon', 'bin/gainLoss.VR01.266.dRep', 'bin/learn', 'bin/merge_gain_loss', 'bin/prune_ncbi_tree', 'bin/summary2gainLoss_input', 'bin/traitarm', 'bin/summary2gainLoss_input', 'bin/write_gainLoss_config'],
         zip_safe=False,
-        install_requires = ["sklearn > 0.18.1", "traitar >= 1.1.2", "ete2", "dendropy", "seaborn"])
+        install_requires = ["scikit-learn > 0.18.1", "traitar >= 1.1.2", "ete2", "dendropy", "seaborn"])
