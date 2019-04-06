@@ -1,0 +1,12 @@
+#! /usr/bin/env python
+from traitarm.reconstruction.write_gainLoss_config import write_config 
+import argparse
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser("write gainLoss param file")
+    parser.add_argument("seq_f", help='binary character file in fasta format')
+    parser.add_argument("tree_f", help='phylogenetic tree in newick format')
+    parser.add_argument("out_dir", help='output directory for gainLoss run')
+    parser.add_argument("result_f", help='gainLoss param file')
+    a = parser.parse_args()
+    write_config(a.seq_f, a.tree_f, a.out_dir, a.result_f)

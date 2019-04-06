@@ -1,42 +1,106 @@
-# traitar-model
-Learning phenotype classification models from protein family phyletic patterns
+# Model-T
+Learning phenotype classification models from protein family phyletic patterns and other kinds of annotations 
+# Installation
+Model-T is available via anaconda / bioconda: Install by 
+
+```
+conda create -n model-t
+source activate model-t
+conda install model-t
+``` 
+
+Be sure to add the bioconda channel as described on the bioconda website before installing Model-T:
+
+```
+conda config --add channels defaults
+conda config --add channels conda-forge
+conda config --add channels bioconda
+```
+
+# Basic usage
+```
+traitarm -h #show Model-T help
+traitarm <out_dir> <phenotype_table> <annotation_table>  <phenotype_name> --cpus <#CPUs>
+```
+Annotation table: a tab separated table of samples (one sample per row) vs. annotation (one feature per columns) as for example produced by ``traitar annotate`` (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/dbcan_annot.txt).
+
+Phenotype table: a tab separated table of samples vs. phenotypes (see example usage; https://github.com/aweimann/traitar-model/blob/master/example/pbd.txt). Use 0 to code the phenotype-negative class, 1 for the phenotype-positive class and ? for missing phenotype labels.
+
+## Including a phylogenetic tree
+Model-T can also use the tree as an additional source of information by reconstructing the evovlutionary history of the genetic features and the phenotype. Model-T will train two additional models in this case: The evo+observed model, which uses both the evolutionary history as well as the observable genotype and phenotype patterns and the evo model, which is inferred only using the genotype and phenotype gains and losses.
+
+```traitarm <out_dir> 10 <phenotype_table> <annotation_table>  <phenotype_name>   --cpus 10 --tree <tree>``` 
+
+The tree should be provided in Newick format and should have been computed based for example on a set of aligned marker genes or core-genes for the input genomic bacterial samples.
+
+## Re-using phenotype models
+For each type of phenotype models trained (observed, evo, observed+evo) there will be a re-usable model available that can be used to predict new samples using Traitar (also see https://github.com/aweimann/traitar). Traitar by default only supports annotation using hmmsearch. 
+
+```
+traitar phenotype <input_dir> <sample_table> <from_nucleotides/from_genes> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>
+```
+
+If you're using some other kind of annotation for instance SNPs, gene expression data or gene family presence and absence information generated with Roary, you have to ensure that the annotation is generated the same way as the training data was generated e.g. using the same SNP calling pipeline or in case of Roary generating your own set of HMMs and annotating the new genomes. In this case you need to use Traitar with the from_annotation and the -a option to provide a pre-computed annotation table.
+
+```
+traitar phenotype <input_dir> <sample_table> from_annotation -a <path_to_annotation> -p <newly_computed_pt_model> --primary_hmm_db <hmm_db_file>
+```
+
 ## Example usage
-Construct a plant biomass degradation phenotype model based on the example data
+Construct a plant biomass degradation genotype-phenotype model based on the example data
 
-1. Convert table of dbCAN families (features) and phenotypes (targets) to FASTA input required for the gainLoss program
+1. Download amino acid FASTA files from PATRIC database for plant biomass degrading and non-degrading strains
   
-  ``python summary2gainLoss_input.py < dbcan_summary_stol_pt_named.txt > dbcan.fasta``
+  ```
+  mkdir example/faa
+  cd example
+  cut -f1 sample_table.txt | while read i; do wget -P <example_dir>/faa ftp://ftp.patricbrc.org/patric2/current_release/faa/$i; done
+  ```
   
-2. Prune sequenced tree of life to the plant biomass degrader and non-degraders; one version with named internal nodes and one unnamed
+2. Annotate downloaded CDS with Pfam families (using 10 cores)
 
-  `python prune_ncbi_tree.py  ncbi-bacteria.tre --ncbi_ids pbd_taxids_stol.txt pbd_named.tre  --do_name_internal`
-  
-  `python prune_ncbi_tree.py ncbi-bacteria.tre --ncbi_ids pbd_taxids_stol.txt pbd.tre --format 5  --failed_to_map     pbd_taxids_stol_mapped.txt`
+   ```
+   traitar annotate faa sample_table.txt from_genes traitar_out  -c 10
+   ```
+3. Train plant biomass degradation Pfam phenotype model 
+    ```
+    cd ..
+    traitarm pbd_out example/pbd.txt example/traitar_out/annotation/dbcan/summary.dat  --feature_mapping  example/dbcan2desc_name_full.txt  10   --do_phypat_only --cpus 10
+    ``` 
+## Using an HMM database other than Pfam
 
-3. Run reconstruction with gainLoss
-  
-  `gainLoss.VR01.266.dRep gainLoss_params.txt`
-  
-4. Reconstruct likelihood matrix
-  
-  Loss matrix
-  
-  `python build_edge_matrix_likelihood.py pbd_named.tre  dbcan_summary_stol_pt_named.txt   RESULTS/gainLossProbExpPerPosPerBranch.txt  dbcans.txt phenotypes.txt pgl_matrix_gain`
-  
-  Gain matrix
-  
-  `python build_edge_matrix_likelihood.py pbd_named.tre  dbcan_summary_stol_pt_named.txt   RESULTS/gainLossProbExpPerPosPerBranch.txt  dbcans.txt phenotypes.txt pgl_matrix_gain`
-  
-5. Discretize and join likelihood matrix
-  
-  `python discretize_likelihood_recon.py -d pgl_matrix_gain/ -t 0.5 -o pgl_matrix_gain_loss -f pgl_matrix_loss -g`
-  
-6. Build classficiation models
-  
-  Only with phyletic patterns
-  
-  `python learning.py  dbcan_summary_stol_pt_named.txt   10 ll_pbd dbcan2desc_name_full.txt pt_all_settings2acc.txt  config.json`
-  
-  With gain and loss events
-  
- `python learning  dbcan_summary_stol_pt_named.txt   10 ll_pbd_pgl dbcan2desc_name_full.txt pt_all_settings2acc.txt  config.json   --is_phypat_and_rec --rec_dir pgl_matrix_gain_loss/  --likelihood_params threshold:0.5,mode:gain_loss`
+1. Download HMM database
+
+```
+wget http://csbl.bmb.uga.edu/dbCAN/download/dbCAN-fam-HMMs.txt.v4
+```
+
+2. Link dbCAN families with descriptions creating an empty phenotype model archive file using Traitar
+
+```
+traitar new  dbcan2desc_name_full.txt dbcan dbcan_v4
+```
+
+3. Annotate with Traitar using the new phenotype model archive using 10 CPUs
+
+``` 
+traitar annotate --primary_hmm_db dbCAN-fam-HMMs.txt.v4 -p dbcan_v4.tar.gz faa/ sample_table.txt from_genes traitar_dbcan_v4_out/ --cpus 10 
+``` 
+
+4. Train a model for Traitar using Model-T
+
+```
+traitarm pbd_dbcan_out  pbd.txt traitar_dbcan_v4_out/annotation/dbcan/summary.dat  --feature_mapping dbcan2desc_name_full.txt  10  --cpus 10
+```
+
+# Output
+cv_acc.txt gives information about the overall performance of the models for each phenotype including the 
+TPR = true positive rate, TNR = true negative rate, BACC = balanced accuracy, precision, F1-Score and AUC = Area under the curve
+
+<pt_model>heatmap.png shows in the upper panel the distribution of the most discriminatory feature found by Model-T across the samples of the phenotype-positive class (black) and the phenotype-negative class (orange). In the bottom panel you can see the importance of each invidual feature for slightly different version of the classifier. Red indicates a feature relevant for the phenotype-positive class. 
+
+<pt_model>_non-zero+weights.txt lists all features, which were found to be relevant for the classification including some information on how good these would do discriminate the phenotype-positive  and negative-samples individually.
+
+<pt_model>_roc_curve.png shows different trade-offs of sensitivity vs. specificity that are achievable with the classifier.
+
+<pt_model>_miscl.txt provides all samples.txt that were assigned to either the phenotype-positive class although they belonng the phenotype-negative class or vice versa.

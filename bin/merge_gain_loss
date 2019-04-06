@@ -1,0 +1,14 @@
+#! /usr/bin/env python
+from traitarm.reconstruction.merge_gain_loss import reduce 
+import argparse 
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("out_dir", help='output directory')
+    parser.add_argument("in_dir", help='input directory')
+    parser.add_argument("feats", help='feature file')
+    parser.add_argument("parts", type = int, help='number of splits')
+    parser.add_argument("phenotypes", help='phenotype file')
+    a = parser.parse_args()
+    reduce(**vars(a))
+

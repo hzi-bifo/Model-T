@@ -1,0 +1,54 @@
+#! /usr/bin/env python
+from traitarm.learning.learn import pt_classification
+import os
+import pandas as pd
+
+if __name__=="__main__":
+    import argparse
+    parser = argparse.ArgumentParser("traitar-model the phenotype classifier")
+    parser.add_argument("phypat_f", help='phyletic patterns, i.e. one matrix with all the phenotypes')
+    parser.add_argument("cv_outer", type = int, help = 'the number of folds used for outer cross validation' ) 
+    parser.add_argument("out",  help = 'for the models, selected features etc.') 
+    parser.add_argument("pf2acc_desc_f", help = "pfam mapping file")
+    parser.add_argument("pt2acc_f", help = "phenotype mapping file")
+    parser.add_argument("config_f", help = "location of the config file")
+    parser.add_argument("ids2name", help = "mapping of sample ids to names")
+
+    parser.add_argument("--rec_dir", default = None, help='one matrix for each phenotype or in case of phyletic pattern classification one matrix with all the phenotypes')
+    parser.add_argument("--with_seed", action = 'store_true', help='set a seed for reproducable cross validations etc.')
+    parser.add_argument("--likelihood_params", default = None, help='<threshold:x,mode:<gain, loss, gain_loss>> only use if in reconstruction classification i.e. option -d is set as well')
+    parser.add_argument("--is_discrete_phenotype_with_continuous_features", action = 'store_true', help='set if input features are continuous')
+    parser.add_argument("--tree", default = None, help='tree for the likelihood reconstruction')
+    parser.add_argument("--tree_named", default = None, help='named tree for the likelihood reconstruction')
+    parser.add_argument("--is_phypat_and_rec", action = "store_true", help='only use if in reconstruction classification i.e. option likelihood_params is set as well; training will be done on the gains and losses and the phyletic patterns')
+    parser.add_argument("--do_standardization",  action = "store_true", help = "use raw data with standardization and don't binarize")
+    parser.add_argument("--perc_feats", default = 1.0, type = int, help = "percent of features to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all features included")
+    parser.add_argument("--perc_samples", default = 1.0, type = int, help = "percent of samples to use for the individual classifiers. 1.0 corresponds to the vanilla SVM with all samples included")
+    parser.add_argument("--inverse_feats", action = "store_true", help = "if option set, extend the feature space in the classification by the inverse features (1-X) to get rid of noise features")
+    parser.add_argument("--resume", action = "store_true", help = "if set the program tries to resume the classification / feature selection i.e. the output directory already exists")
+    parser.add_argument("--cv_inner", type = int, default = None, help = 'the number of folds used for inner cross validation if this option is given nested cross validation will be performed otherwise only feature selection routines will launched') 
+    parser.add_argument("--consider_in_recon",  default = [], help = 'list of samples that are only contained with a phyletic pattern but not in the tree') 
+    parser.add_argument("--n_jobs", type = int, default = 1, help = "number of jobs that shall be used")
+    parser.add_argument("--block_cross_validation", help='a table with group assignments for each sample')
+    parser.add_argument("--opt_measure", default = "bacc", choices = ["bacc", "F1-score", "neg-F1-score"], help='select measure for parameter optimization')
+    #Deprecated parsimony option
+    #-a <gain_costs:x,mode:<ACCTRAN, DELTRAN, RANDOM>> only use if in reconstruction classification i.e. option -d is set as well, in that case -a means that we have parsimony reconstruction, this is followed by the options for the parsimony-based reconstruction e.g. -l threshold:0.5,mode:gain 
+    #parsimony_params = None
+    #parse likelihood option
+    a = parser.parse_args()
+    if not a.likelihood_params is None:
+        a.likelihood_params =  dict(i.split(":") for i in a.likelihood_params.strip().split(","))
+    #parse samples that shall be considered in the reconstruction
+    if not a.consider_in_recon == []:
+        a.consider_in_recon = pd.read_csv(a.consider_in_recon, index_col = 0, header = None)
+        a.consider_in_recon.index = a.consider_in_recon.index.astype('string')
+    #parsimony_params =  dict(i.split(":") for i in a.strip().split(","))
+    if os.path.exists(a.out) and not a.resume:
+        sys.stderr.write("output directory %s already exists; delete and rerun\n"%a.out)
+        sys.exit(1)
+    elif not os.path.exists(a.out):
+        try:
+            os.mkdir(a.out)
+        except OSError:
+            pass
+    pt_cl = pt_classification(config_f = a.config_f, phypat_f = a.phypat_f,  pf2acc_desc_f = a.pf2acc_desc_f, pt2acc_f = a.pt2acc_f, ids2name = a.ids2name, rec_dir = a.rec_dir, likelihood_params = a.likelihood_params,  is_phypat_and_rec = a.is_phypat_and_rec, cv_inner = a.cv_inner, cv_outer = a.cv_outer, model_out = a.out, n_jobs = a.n_jobs, perc_samples = a.perc_samples, perc_feats = a.perc_feats, inverse_feats = a.inverse_feats, do_standardization = a.do_standardization, resume = a.resume, consider_in_recon = a.consider_in_recon, with_seed = a.with_seed, tree = a.tree, tree_named = a.tree_named, is_discrete_phenotype_with_continuous_features = a.is_discrete_phenotype_with_continuous_features, block_cross_validation = a.block_cross_validation, opt_measure = a.opt_measure) 
