@@ -9,7 +9,7 @@
         "penalty": "l1",
         "random_state": 1,
         "tol": 1e-06,
-        "class_weight": "auto"
+        "class_weight": "balanced"
     },
     "min_pos": 10,
     "k": 5,
